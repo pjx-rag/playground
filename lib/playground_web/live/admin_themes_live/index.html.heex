@@ -1,0 +1,340 @@
+<.page_layout>
+  <div class="space-y-6">
+    <!-- Header with Actions -->
+    <div class="flex items-center justify-between">
+      <p class="text-sm text-muted-foreground">
+        Customize the look and feel of your application.
+      </p>
+      <.button variant="solid" color="primary" phx-click={JS.patch(~p"/admin/themes/new")}>
+        <.icon name="hero-plus" class="size-4 mr-2" />
+        Create Theme
+      </.button>
+    </div>
+
+    <!-- Active Themes Selection -->
+    <div class="bg-card shadow rounded-lg border border-base overflow-hidden">
+      <div class="px-4 py-4 border-b border-base bg-muted">
+        <h2 class="text-lg font-semibold text-foreground">Active Themes</h2>
+        <p class="text-sm text-muted-foreground mt-1">
+          Select which themes to use for light and dark modes.
+        </p>
+      </div>
+
+      <div class="px-4 py-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Light Mode Theme -->
+        <.form for={%{}} phx-change="set_light_theme">
+          <label class="block text-sm font-medium text-foreground mb-2">
+            <.icon name="hero-sun" class="size-4 inline mr-1" />
+            Light Mode Theme
+          </label>
+          <.select
+            name="light_theme"
+            value={@site_settings.light_theme_id}
+            options={Enum.map(@light_themes, &{&1.name, &1.id})}
+            placeholder="Select a light theme..."
+            id="light-theme-select"
+          />
+        </.form>
+
+        <!-- Dark Mode Theme -->
+        <.form for={%{}} phx-change="set_dark_theme">
+          <label class="block text-sm font-medium text-foreground mb-2">
+            <.icon name="hero-moon" class="size-4 inline mr-1" />
+            Dark Mode Theme
+          </label>
+          <.select
+            name="dark_theme"
+            value={@site_settings.dark_theme_id}
+            options={Enum.map(@dark_themes, &{&1.name, &1.id})}
+            placeholder="Select a dark theme..."
+            id="dark-theme-select"
+          />
+        </.form>
+      </div>
+    </div>
+
+    <!-- Available Themes Grid -->
+    <div class="bg-card shadow rounded-lg border border-base overflow-hidden">
+      <div class="px-4 py-4 border-b border-base bg-muted">
+        <h2 class="text-lg font-semibold text-foreground">Available Themes</h2>
+        <p class="text-sm text-muted-foreground mt-1">
+          Click a theme card to preview it. Changes are applied instantly.
+        </p>
+      </div>
+
+      <div class="p-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <%= for theme <- @themes do %>
+            <.theme_card
+              theme={theme}
+              is_active={is_active_theme?(theme, @site_settings)}
+            />
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Theme Editor Sheet -->
+  <.sheet
+    :if={@show_editor}
+    id="theme-editor"
+    open
+    placement="right"
+    class="w-full max-w-md"
+    on_close={JS.push("close_editor")}
+  >
+    <div class="h-full flex flex-col">
+      <div class="px-6 py-4 border-b border-base">
+        <h3 class="text-lg font-semibold text-foreground">
+          <%= if @editing_theme.id, do: "Edit Theme", else: "Create Theme" %>
+        </h3>
+        <p class="text-sm text-muted-foreground mt-1">
+          Changes are previewed live as you edit.
+        </p>
+      </div>
+
+      <div class="flex-1 overflow-y-auto px-6 py-4">
+        <!-- Live Preview -->
+        <div class="mb-6">
+          <h4 class="font-medium text-foreground mb-3">Preview</h4>
+          <div
+            class="rounded-lg p-4 border"
+            style={"background-color: #{get_token_value(@editing_theme, "background_base")}; border-color: #{get_token_value(@editing_theme, "border_base")};"}
+          >
+            <!-- Button preview -->
+            <div class="flex items-center gap-2 mb-3">
+              <div
+                class="px-3 py-1.5 rounded text-sm font-medium"
+                style={"background-color: #{get_token_value(@editing_theme, "primary")}; color: #{get_token_value(@editing_theme, "foreground_primary")};"}
+              >
+                Primary Button
+              </div>
+              <div
+                class="px-3 py-1.5 rounded text-sm font-medium border"
+                style={"background-color: #{get_token_value(@editing_theme, "surface")}; color: #{get_token_value(@editing_theme, "foreground")}; border-color: #{get_token_value(@editing_theme, "border_base")};"}
+              >
+                Secondary
+              </div>
+            </div>
+
+            <!-- Text preview -->
+            <div class="mb-3">
+              <p
+                class="text-sm font-medium mb-1"
+                style={"color: #{get_token_value(@editing_theme, "foreground")};"}
+              >
+                Primary Text
+              </p>
+              <p
+                class="text-sm mb-1"
+                style={"color: #{get_token_value(@editing_theme, "foreground_soft")};"}
+              >
+                Secondary text content
+              </p>
+              <p
+                class="text-xs"
+                style={"color: #{get_token_value(@editing_theme, "foreground_softer")};"}
+              >
+                Muted helper text
+              </p>
+            </div>
+
+            <!-- Input preview -->
+            <div
+              class="rounded px-3 py-2 text-sm border mb-3"
+              style={"background-color: #{get_token_value(@editing_theme, "background_input")}; border-color: #{get_token_value(@editing_theme, "border_base")}; color: #{get_token_value(@editing_theme, "foreground_softer")};"}
+            >
+              Input placeholder...
+            </div>
+
+            <!-- Status colors -->
+            <div class="flex gap-2">
+              <span
+                class="px-2 py-1 rounded text-xs font-medium text-white"
+                style={"background-color: #{get_token_value(@editing_theme, "danger")};"}
+              >
+                Danger
+              </span>
+              <span
+                class="px-2 py-1 rounded text-xs font-medium text-white"
+                style={"background-color: #{get_token_value(@editing_theme, "success")};"}
+              >
+                Success
+              </span>
+              <span
+                class="px-2 py-1 rounded text-xs font-medium"
+                style={"background-color: #{get_token_value(@editing_theme, "warning")}; color: #000;"}
+              >
+                Warning
+              </span>
+              <span
+                class="px-2 py-1 rounded text-xs font-medium text-white"
+                style={"background-color: #{get_token_value(@editing_theme, "info")};"}
+              >
+                Info
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <.form for={@form} phx-change="validate" phx-submit="save" class="space-y-6">
+          <!-- Basic Info -->
+          <div class="space-y-4">
+            <div>
+              <.label for="theme_name">Name</.label>
+              <.input
+                type="text"
+                name="theme[name]"
+                id="theme_name"
+                value={@form[:name].value}
+                placeholder="My Custom Theme"
+              />
+              <.error :for={error <- @form[:name].errors}>{translate_error(error)}</.error>
+            </div>
+
+            <div>
+              <.label for="theme_slug">Slug</.label>
+              <.input
+                type="text"
+                name="theme[slug]"
+                id="theme_slug"
+                value={@form[:slug].value}
+                placeholder="my-custom-theme"
+              />
+              <.error :for={error <- @form[:slug].errors}>{translate_error(error)}</.error>
+            </div>
+
+            <div>
+              <.label for="theme_mode">Mode</.label>
+              <.select
+                name="theme[mode]"
+                id="theme_mode"
+                value={@form[:mode].value}
+                options={[{"Light", "light"}, {"Dark", "dark"}]}
+              />
+            </div>
+          </div>
+
+          <!-- Color Tokens -->
+          <div class="space-y-4">
+            <h4 class="font-medium text-foreground">Primary Colors</h4>
+
+            <div class="grid grid-cols-2 gap-4">
+              <.color_input
+                name="theme[primary]"
+                label="Primary"
+                value={get_token_value(@editing_theme, "primary")}
+              />
+              <.color_input
+                name="theme[primary_soft]"
+                label="Primary Soft"
+                value={get_token_value(@editing_theme, "primary_soft")}
+              />
+              <.color_input
+                name="theme[foreground_primary]"
+                label="Primary Text"
+                value={get_token_value(@editing_theme, "foreground_primary")}
+              />
+            </div>
+
+            <h4 class="font-medium text-foreground pt-2">Background Colors</h4>
+
+            <div class="grid grid-cols-2 gap-4">
+              <.color_input
+                name="theme[background_base]"
+                label="Background"
+                value={get_token_value(@editing_theme, "background_base")}
+              />
+              <.color_input
+                name="theme[background_accent]"
+                label="Background Accent"
+                value={get_token_value(@editing_theme, "background_accent")}
+              />
+              <.color_input
+                name="theme[background_input]"
+                label="Input Background"
+                value={get_token_value(@editing_theme, "background_input")}
+              />
+              <.color_input
+                name="theme[surface]"
+                label="Surface"
+                value={get_token_value(@editing_theme, "surface")}
+              />
+              <.color_input
+                name="theme[overlay]"
+                label="Overlay"
+                value={get_token_value(@editing_theme, "overlay")}
+              />
+            </div>
+
+            <h4 class="font-medium text-foreground pt-2">Text Colors</h4>
+
+            <div class="grid grid-cols-2 gap-4">
+              <.color_input
+                name="theme[foreground]"
+                label="Text"
+                value={get_token_value(@editing_theme, "foreground")}
+              />
+              <.color_input
+                name="theme[foreground_soft]"
+                label="Text Soft"
+                value={get_token_value(@editing_theme, "foreground_soft")}
+              />
+              <.color_input
+                name="theme[foreground_softer]"
+                label="Text Softer"
+                value={get_token_value(@editing_theme, "foreground_softer")}
+              />
+              <.color_input
+                name="theme[foreground_softest]"
+                label="Text Softest"
+                value={get_token_value(@editing_theme, "foreground_softest")}
+              />
+              <.color_input
+                name="theme[border_base]"
+                label="Border"
+                value={get_token_value(@editing_theme, "border_base")}
+              />
+            </div>
+
+            <h4 class="font-medium text-foreground pt-2">Status Colors</h4>
+
+            <div class="grid grid-cols-2 gap-4">
+              <.color_input
+                name="theme[danger]"
+                label="Danger"
+                value={get_token_value(@editing_theme, "danger")}
+              />
+              <.color_input
+                name="theme[success]"
+                label="Success"
+                value={get_token_value(@editing_theme, "success")}
+              />
+              <.color_input
+                name="theme[warning]"
+                label="Warning"
+                value={get_token_value(@editing_theme, "warning")}
+              />
+              <.color_input
+                name="theme[info]"
+                label="Info"
+                value={get_token_value(@editing_theme, "info")}
+              />
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex justify-end gap-3 pt-4 border-t border-base">
+            <.button type="button" variant="outline" phx-click="close_editor">
+              Cancel
+            </.button>
+            <.button type="submit" variant="solid" color="primary">
+              Save Theme
+            </.button>
+          </div>
+        </.form>
+      </div>
+    </div>
+  </.sheet>
+</.page_layout>

@@ -1,0 +1,16 @@
+# Ignore all subdirectories and files
+*
+
+# Except for these directories and files
+!assets
+!config
+!lib
+!priv
+!rel
+!mix.exs
+!mix.lock
+!.formatter.exs
+
+# Exclude generated and cached files from included dirs
+assets/node_modules
+priv/static/assets

@@ -1,0 +1,24 @@
+<div class="flex min-h-screen flex-col items-center justify-center bg-base">
+  <div class="text-center">
+    <h1 class="text-4xl font-bold tracking-tight text-foreground sm:text-6xl">
+      Welcome to Playground
+    </h1>
+    <p class="mt-6 text-lg leading-8 text-muted-foreground">
+      A Phoenix starter kit with authentication, Fluxon UI, and more.
+    </p>
+    <div class="mt-10 flex items-center justify-center gap-x-6">
+      <.link
+        navigate="/users/register"
+        class="rounded-md bg-primary px-3.5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-primary"
+      >
+        Get started
+      </.link>
+      <.link
+        navigate="/users/log_in"
+        class="text-sm font-semibold leading-6 text-foreground hover:text-primary"
+      >
+        Log in <span aria-hidden="true">→</span>
+      </.link>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,229 @@
+<div class="flex flex-col h-[calc(100vh-8rem)]">
+  <%!-- Main Chat Area --%>
+  <div class="flex-1 flex flex-col min-w-0">
+    <%!-- Chat Header - always visible --%>
+    <div class="border-b border-base px-4 md:px-6 py-3 md:py-4 bg-card">
+      <div class="flex items-center justify-between">
+        <div class="flex-1 min-w-0 mr-4">
+          <%= if @current_chat do %>
+            <%= if @viewed_user_id == @current_user.id do %>
+              <.form for={%{}} phx-change="rename_chat" class="contents">
+                <input
+                  type="text"
+                  name="title"
+                  value={@current_chat.title}
+                  phx-debounce="300"
+                  class="text-lg md:text-xl font-semibold text-foreground bg-transparent border-0 border-b border-transparent hover:border-base focus:border-primary focus:ring-0 w-full px-0 py-0 transition-colors"
+                />
+              </.form>
+            <% else %>
+              <h1 class="text-lg md:text-xl font-semibold text-foreground">{@current_chat.title}</h1>
+            <% end %>
+            <p class="text-xs md:text-sm text-muted-foreground truncate">{@current_chat.model}</p>
+          <% else %>
+            <h1 class="text-lg md:text-xl font-semibold text-foreground">AI Chat</h1>
+            <p class="text-xs md:text-sm text-muted-foreground">Select or create a chat</p>
+          <% end %>
+        </div>
+        <%!-- Toggle sidebar button - always visible --%>
+        <.button
+          variant="ghost"
+          size="sm"
+          phx-click={Fluxon.open_dialog("chat-history-sheet")}
+        >
+          <.icon name="hero-bars-3" class="size-5" />
+        </.button>
+      </div>
+    </div>
+
+    <%= if @current_chat do %>
+
+      <%!-- Messages Area --%>
+      <div class="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-4 relative" id="messages-container" phx-hook="ChatScroll">
+        <%= for message <- @messages do %>
+          <div class={"flex #{if message.role == "user", do: "justify-end", else: "justify-start"}"}>
+            <div class={"max-w-[85%] md:max-w-3xl px-4 py-3 #{if message.role == "user", do: "bg-primary text-primary-foreground rounded-2xl rounded-br-sm", else: "bg-card border border-base text-foreground shadow-sm rounded-2xl rounded-bl-sm"}"}>
+              <%= if message.role == "assistant" do %>
+                <div class="prose prose-sm max-w-none dark:prose-invert">
+                  {raw(MDEx.to_html!(message.content, sanitize: true))}
+                </div>
+              <% else %>
+                <div>{message.content}</div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+
+        <%!-- Streaming Content --%>
+        <%= if @is_streaming do %>
+          <div class="flex justify-start">
+            <div class="max-w-[85%] md:max-w-3xl px-4 py-3 rounded-2xl rounded-bl-sm bg-card border border-base text-foreground shadow-sm">
+              <%= if @streaming_content != "" do %>
+                <div class="prose prose-sm max-w-none dark:prose-invert">
+                  {raw(MDEx.to_html!(@streaming_content, sanitize: true))}
+                </div>
+              <% end %>
+              <div class="mt-2 flex items-center text-xs text-muted-foreground">
+                <span class="animate-pulse">●</span>
+                <span class="ml-2">AI is typing...</span>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <%!-- Scroll to bottom button --%>
+        <button
+          id="scroll-to-bottom"
+          class="hidden sticky bottom-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-lg hover:bg-primary/90 transition-all z-10"
+          phx-click={JS.dispatch("scroll-to-bottom", to: "#messages-container")}
+        >
+          <.icon name="hero-arrow-down" class="size-4 mr-1 inline" />
+          New messages
+        </button>
+      </div>
+
+      <%!-- Input Area --%>
+      <div class="border-t border-base px-4 md:px-6 py-3 md:py-4 bg-card">
+        <%= if @viewed_user_id == @current_user.id do %>
+          <%!-- Rate Limit Display (hidden on mobile for space) --%>
+          <div class="hidden md:block mb-2 text-xs text-muted-foreground">
+            Rate limit: {@rate_limit.per_minute.remaining}/{@rate_limit.per_minute.limit} per min,
+            {@rate_limit.per_hour.remaining}/{@rate_limit.per_hour.limit} per hour,
+            {@rate_limit.per_day.remaining}/{@rate_limit.per_day.limit} per day
+          </div>
+
+          <.form for={%{}} phx-submit="send_message" class="flex gap-2">
+            <div class="flex-1">
+              <.input
+                type="text"
+                id="message-input"
+                name="message[content]"
+                value={@input_value}
+                placeholder="Type your message..."
+                disabled={@is_streaming}
+                autocomplete="off"
+                phx-hook="AutoFocus"
+              />
+            </div>
+            <.button
+              type="submit"
+              variant="solid"
+              color="primary"
+              disabled={@is_streaming}
+              class="flex-shrink-0"
+            >
+              <.icon name="hero-paper-airplane" class="size-4 md:mr-1" />
+              <span class="hidden md:inline">Send</span>
+            </.button>
+          </.form>
+        <% else %>
+          <div class="text-center text-muted-foreground py-4">
+            Viewing {@viewed_user.email}'s chats - cannot send messages
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <%!-- No Chat Selected --%>
+      <div class="flex-1 flex items-center justify-center p-4">
+        <div class="text-center">
+          <p class="text-lg md:text-xl text-muted-foreground mb-4">Select a chat or create a new one</p>
+          <%= if @viewed_user_id == @current_user.id do %>
+            <.button
+              variant="solid"
+              color="primary"
+              size="lg"
+              phx-click={Fluxon.open_dialog("chat-history-sheet")}
+            >
+              <.icon name="hero-plus" class="size-5 mr-2" />
+              New Chat
+            </.button>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%!-- Chat History Sheet --%>
+<.sheet id="chat-history-sheet" placement="right" class="w-full max-w-sm">
+  <h2 class="text-lg font-semibold text-foreground mb-4">Chat History</h2>
+
+  <%!-- Admin User Selector --%>
+  <%= if @is_admin do %>
+    <div class="mb-4">
+      <.label class="mb-1">Viewing chats for:</.label>
+      <.select
+        name="user_id"
+        value={cond do
+          @viewed_user_id == @current_user.id -> ""
+          is_nil(@viewed_user_id) -> "all"
+          true -> @viewed_user_id
+        end}
+        options={[
+          {"#{@current_user.email} (You)", ""},
+          {"All Users", "all"}
+        ] ++ Enum.map(Enum.filter(@available_users, & &1.id != @current_user.id), &{&1.email, &1.id})}
+        phx-change="change_viewed_user"
+      />
+    </div>
+  <% end %>
+
+  <%!-- Model Selector and New Chat Button --%>
+  <%= if @viewed_user_id == @current_user.id do %>
+    <div class="space-y-2 mb-4">
+      <.label class="text-xs">Model:</.label>
+      <.form for={%{}} phx-change="change_model">
+        <.select
+          name="model"
+          value={@selected_model}
+          options={@available_models}
+          searchable
+          search_input_placeholder="Search models..."
+        />
+      </.form>
+      <.button
+        variant="solid"
+        color="primary"
+        class="w-full"
+        phx-click={JS.push("new_chat") |> Fluxon.close_dialog("chat-history-sheet")}
+      >
+        <.icon name="hero-plus" class="size-4 mr-2" />
+        New Chat
+      </.button>
+    </div>
+  <% end %>
+
+  <%!-- Chat List --%>
+  <div class="space-y-2">
+    <%= for chat <- @chats do %>
+      <div
+        class={"group relative px-3 py-2 rounded-base cursor-pointer transition-colors #{if @current_chat && @current_chat.id == chat.id, do: "bg-primary text-primary-foreground", else: "bg-overlay hover:bg-muted text-foreground"}"}
+      >
+        <div
+          phx-click={JS.push("select_chat", value: %{chat_id: chat.id}) |> Fluxon.close_dialog("chat-history-sheet")}
+        >
+          <div class="flex items-center justify-between">
+            <span class="truncate flex-1 pr-8">{chat.title}</span>
+            <%= if chat.is_processing do %>
+              <span class="text-xs ml-2 animate-pulse">●</span>
+            <% end %>
+          </div>
+          <div class="text-xs opacity-70 mt-1">
+            {Calendar.strftime(chat.updated_at, "%b %d, %I:%M %p")}
+          </div>
+        </div>
+        <%!-- Delete button --%>
+        <%= if @viewed_user_id == @current_user.id do %>
+          <button
+            phx-click="delete_chat"
+            phx-value-chat_id={chat.id}
+            data-confirm="Are you sure you want to delete this chat?"
+            class={"absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-base #{if @current_chat && @current_chat.id == chat.id, do: "text-primary-foreground hover:bg-primary-foreground/20", else: "text-danger hover:bg-danger/10"}"}
+          >
+            <.icon name="hero-trash" class="size-4" />
+          </button>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</.sheet>

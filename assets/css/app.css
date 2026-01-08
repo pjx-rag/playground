@@ -1,0 +1,59 @@
+@import "tailwindcss";
+@source "../css";
+@source "../js";
+@source "../../lib/playground_web";
+@source "../../deps/fluxon/**/*.*ex";
+@import "../../deps/fluxon/priv/static/theme";
+
+@layer components {
+}
+
+/* Tailwind v4 Theme Configuration */
+@theme {
+  /* Font families */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Extend Fluxon theme: add bg-card to match page background (bg-base) */
+  --background-color-card: var(--background-base);
+
+  /* Map muted colors to Fluxon's foreground-softer token for compatibility */
+  --background-color-muted: var(--background-accent);
+  --text-color-muted-foreground: var(--foreground-softer);
+  --text-color-card-foreground: var(--foreground);
+
+  /* Primary color scale - customize these for your brand */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+}
+
+/* Card container utility */
+.card-container {
+  @apply bg-card shadow-base rounded-base border border-base;
+}
+
+/* Section within a card that contains dropdowns - allows them to overflow */
+.card-header-section {
+  @apply overflow-visible;
+}
+
+/* Section within a card that needs horizontal scrolling (tables, wide content) */
+.card-scroll-section {
+  @apply overflow-x-auto;
+}
+
+/* Logo invert utility - inverts white logos to black in light mode */
+.logo-adaptive {
+  filter: invert(1);
+}
+
+.dark .logo-adaptive {
+  filter: invert(0);
+}
