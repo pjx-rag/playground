@@ -37,8 +37,8 @@ doppler setup
 ### 4. Install Dependencies
 
 ```bash
-doppler run -- mix deps.get
-doppler run -- npm install --prefix assets
+mix deps.get
+npm install --prefix assets
 ```
 
 ### 5. Set Up Database
@@ -46,10 +46,7 @@ doppler run -- npm install --prefix assets
 The database URL is already configured in Doppler (Neon PostgreSQL).
 
 ```bash
-# Create database (if needed)
-doppler run -- mix ecto.create
-
-# Run migrations
+# Run migrations (requires DATABASE_URL from Doppler)
 doppler run -- mix ecto.migrate
 
 # Seed database with admin user and initial data
@@ -78,10 +75,12 @@ Convenience scripts that automatically load secrets from Doppler:
 ./bin/test       # Run tests
 ```
 
-Or run any Mix command with Doppler:
+Or prefix any command that needs secrets with Doppler:
 
 ```bash
-doppler run -- mix <command>
+doppler run -- mix ecto.migrate
+doppler run -- mix phx.server
+# etc.
 ```
 
 ## Secrets Management
