@@ -38,6 +38,10 @@ npm-debug.log
 # Environment files (keep .env.example, ignore .env with secrets)
 .env
 
+# Doppler local config (secrets managed in Doppler cloud)
+doppler.yaml
+.doppler.yaml
+
 # Claude Code files
 .claude/
 AGENTS.md

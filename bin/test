@@ -1,0 +1,11 @@
+#!/bin/bash
+# Run tests with Doppler secrets injection
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "🔐 Loading secrets from Doppler..."
+echo "🧪 Running tests..."
+
+doppler run -- mix test "$@"

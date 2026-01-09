@@ -1,0 +1,11 @@
+#!/bin/bash
+# Interactive Elixir console with Doppler secrets injection
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "🔐 Loading secrets from Doppler..."
+echo "💻 Starting IEx console..."
+
+doppler run -- iex -S mix
