@@ -1,85 +1,158 @@
 # Playground
 
-Phoenix starter kit with auth, authorization, AI chat, background jobs, and admin dashboard.
+Phoenix starter kit with authentication, authorization, AI chat, background jobs, and admin dashboard.
+
+## Prerequisites
+
+- Elixir 1.17+ and Erlang/OTP 27+
+- PostgreSQL 16+ (or use Neon - already configured)
+- Node.js 18+ (for asset compilation)
+- [Doppler CLI](https://docs.doppler.com/docs/install-cli) for secrets management
 
 ## Quick Start
 
-### With Doppler (Recommended - Secrets Management)
+### 1. Install Doppler CLI
 
 ```bash
-# 1. Install Doppler CLI
 brew install dopplerhq/cli/doppler
+```
 
-# 2. Authenticate
+### 2. Authenticate with Doppler
+
+```bash
 doppler login
+```
 
-# 3. Set up project (first time only)
+### 3. Clone and Set Up Project
+
+```bash
+cd /Users/giovanniorlando/pjx-rag/playground
+
+# Link to Doppler project (first time only)
 doppler setup
 # Select: pjx-rag
 # Select environment: dev
+```
 
-# 4. Install dependencies
+### 4. Install Dependencies
+
+```bash
 doppler run -- mix deps.get
+doppler run -- npm install --prefix assets
+```
 
-# 5. Set up database
+### 5. Set Up Database
+
+The database URL is already configured in Doppler (Neon PostgreSQL).
+
+```bash
+# Create database (if needed)
 doppler run -- mix ecto.create
-doppler run -- mix ecto.migrate
-doppler run -- mix run priv/repo/seeds.exs
 
-# 6. Start server with secrets auto-injected
+# Run migrations
+doppler run -- mix ecto.migrate
+
+# Seed database with admin user and initial data
+doppler run -- mix run priv/repo/seeds.exs
+```
+
+### 6. Start Development Server
+
+```bash
 ./bin/dev
 ```
 
-**📚 See [docs/DOPPLER_SETUP.md](docs/DOPPLER_SETUP.md) for detailed Doppler documentation**
+Visit [http://localhost:4000](http://localhost:4000)
 
-### Without Doppler (Local Development)
+**Default admin credentials (from seeds):**
+- Email: `admin@example.com`
+- Password: `password123`
+
+## Development Commands
+
+Convenience scripts that automatically load secrets from Doppler:
 
 ```bash
-# Install dependencies
-mix setup
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your values
-
-# Load environment and start server
-source .env
-mix phx.server
+./bin/dev        # Start Phoenix server
+./bin/console    # Open IEx console
+./bin/test       # Run tests
 ```
 
-Visit [localhost:4000](http://localhost:4000)
+Or run any Mix command with Doppler:
+
+```bash
+doppler run -- mix <command>
+```
 
 ## Secrets Management
 
-This project uses **Doppler** for secure secrets management. All API keys and sensitive config are stored in Doppler and injected at runtime.
+This project uses [Doppler](https://www.doppler.com/) for secure secrets management. All API keys and configuration are stored in Doppler and injected at runtime—never committed to git.
 
-**Benefits:**
-- 🔐 Never commit secrets to git
-- 🔄 Instant secret updates across team
-- 🌍 Separate secrets for dev/staging/production
-- 📊 Audit trail for all secret access
-
-**Quick commands:**
+**View all secrets:**
 ```bash
-./bin/dev        # Start server with Doppler
-./bin/console    # IEx console with Doppler
-./bin/test       # Run tests with Doppler
+doppler secrets
 ```
 
-See [docs/DOPPLER_SETUP.md](docs/DOPPLER_SETUP.md) for full setup guide.
+**Set a new secret:**
+```bash
+doppler secrets set MY_SECRET="value"
+```
 
-## Analytics
+**📚 Full documentation:** [docs/DOPPLER_SETUP.md](docs/DOPPLER_SETUP.md)
 
-This application includes PhoenixAnalytics for tracking user behavior and application performance.
+## Project Structure
 
-### Access
-- URL: `/admin/analytics`
-- Access: Admin users only
-- Features: Request tracking, date filtering, dark mode
+```
+lib/
+├── playground/              # Business logic
+│   ├── accounts/           # User authentication
+│   ├── ai/                 # AI chat system
+│   ├── authorization.ex    # Authorization rules
+│   ├── services/           # External API clients
+│   └── workers/            # Background jobs (Oban)
+├── playground_web/         # Web interface
+│   ├── live/              # LiveView pages
+│   ├── components/        # Reusable UI components
+│   └── controllers/       # HTTP controllers
+config/                     # Configuration files
+priv/repo/migrations/       # Database migrations
+assets/                     # Frontend assets
+docs/                       # Documentation
+```
 
-### Keyboard Shortcuts
-- `t` - Today
-- `w` - Last week
-- `m` - Last 30 days
-- `y` - Last 12 months
-- `a` - All time
+## Features
+
+- 🔐 **Authentication** - User registration, login, password reset
+- 👮 **Authorization** - Role-based access control with Authorizir
+- 🤖 **AI Chat** - Streaming chat with OpenRouter integration
+- 📊 **Admin Dashboard** - User management, roles, permissions, analytics
+- 🎨 **Theming** - Multiple built-in themes with Fluxon UI
+- 📧 **Email** - Transactional emails with Resend (optional)
+- 💾 **Background Jobs** - Async processing with Oban
+- 📈 **Analytics** - Built-in request tracking with PhoenixAnalytics
+- 🔍 **API Logging** - Comprehensive external API request logging
+
+## Tech Stack
+
+- **Framework:** Phoenix 1.7 with LiveView
+- **Database:** PostgreSQL (Neon)
+- **UI:** Fluxon component library
+- **Background Jobs:** Oban
+- **Authentication:** Bcrypt
+- **Authorization:** Authorizir + Bodyguard
+- **AI:** OpenRouter (LLM streaming)
+- **Secrets:** Doppler
+- **Testing:** ExUnit
+
+## Deployment
+
+This project is configured for deployment on [Fly.io](https://fly.io). See deployment documentation for details.
+
+## Documentation
+
+- [Doppler Setup Guide](docs/DOPPLER_SETUP.md) - Secrets management
+- [State Machines Guide](docs/guides/state-machines.md) - Using Machinery for workflows
+
+## Support
+
+For issues or questions, check the admin dashboard or review the documentation in `docs/`.
