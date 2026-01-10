@@ -99,7 +99,7 @@ defmodule Playground.AI do
   end
 
   @doc """
-  Creates a chat.
+  Creates a chat with AI settings from app defaults.
 
   ## Examples
 
@@ -111,10 +111,51 @@ defmodule Playground.AI do
 
   """
   def create_chat(%User{} = user, attrs \\ %{}) do
+    # Get AI defaults from app settings
+    defaults = get_ai_defaults()
+
+    # Merge defaults with provided attrs (attrs take precedence)
+    merged_attrs = Map.merge(defaults, stringify_keys(attrs))
+
     %Chat{user_id: user.id}
-    |> Chat.changeset(attrs)
+    |> Chat.changeset(merged_attrs)
     |> Repo.insert()
   end
+
+  defp get_ai_defaults do
+    %{
+      "temperature" => parse_float(Settings.get_app_setting_value("ai_temperature", "0.7")),
+      "max_tokens" => parse_integer(Settings.get_app_setting_value("ai_max_tokens", "4096")),
+      "top_p" => parse_float(Settings.get_app_setting_value("ai_top_p", "1.0")),
+      "frequency_penalty" => parse_float(Settings.get_app_setting_value("ai_frequency_penalty", "0.0")),
+      "presence_penalty" => parse_float(Settings.get_app_setting_value("ai_presence_penalty", "0.0"))
+    }
+  end
+
+  defp stringify_keys(map) when is_map(map) do
+    Map.new(map, fn {k, v} -> {to_string(k), v} end)
+  end
+
+  defp parse_float(value) when is_binary(value) do
+    case Float.parse(value) do
+      {float, _} -> float
+      :error -> 0.0
+    end
+  end
+
+  defp parse_float(value) when is_float(value), do: value
+  defp parse_float(value) when is_integer(value), do: value / 1
+  defp parse_float(_), do: 0.0
+
+  defp parse_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> int
+      :error -> 4096
+    end
+  end
+
+  defp parse_integer(value) when is_integer(value), do: value
+  defp parse_integer(_), do: 4096
 
   @doc """
   Updates a chat with the given attributes.

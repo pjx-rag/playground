@@ -84,6 +84,12 @@ defmodule PlaygroundWeb.Router do
       live "/admin/themes/new", AdminThemesLive.Index, :new
       live "/admin/themes/:id/edit", AdminThemesLive.Index, :edit
       live "/admin/settings", AdminSiteSettingsLive.Index, :index
+      live "/admin/app-settings", AdminAppSettingsLive.Index, :index
+      live "/admin/app-settings/new", AdminAppSettingsLive.Form, :new
+      live "/admin/app-settings/:id/edit", AdminAppSettingsLive.Form, :edit
+      live "/admin/connectors", AdminConnectorsLive.Index, :index
+      live "/admin/connectors/:id", AdminConnectorsLive.Show, :show
+      live "/admin/files", AdminFilesLive.Index, :index
     end
 
     # User management - requires admin:users
@@ -107,6 +113,13 @@ defmodule PlaygroundWeb.Router do
       ] do
       live "/admin/roles", AdminRolesLive.Index, :index
     end
+  end
+
+  scope "/", PlaygroundWeb do
+    pipe_through [:browser, :require_authenticated_user]
+
+    # OAuth callbacks (require authentication)
+    get "/auth/google_drive/callback", AuthController, :google_drive_callback
   end
 
   scope "/", PlaygroundWeb do

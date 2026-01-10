@@ -165,6 +165,28 @@ defmodule PlaygroundWeb.AdminDashboardLive.Index do
             url="/admin/themes"
             icon="hero-swatch"
           />
+          <.quick_link_card
+            title="App Settings"
+            description="Manage application configuration key-value pairs"
+            url="/admin/app-settings"
+            icon="hero-adjustments-horizontal"
+          />
+        </.section_card>
+
+        <!-- AI Section -->
+        <.section_card title="AI" icon="hero-sparkles">
+          <.quick_link_card
+            title="Connectors"
+            description="Connect external data sources (Google Drive, Dropbox, etc.)"
+            url="/admin/connectors"
+            icon="hero-link"
+          />
+          <.quick_link_card
+            title="Files"
+            description="Browse and manage synced files from your connected sources"
+            url="/admin/files"
+            icon="hero-document-duplicate"
+          />
         </.section_card>
 
         <!-- API Health Checks Section -->

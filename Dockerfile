@@ -11,8 +11,8 @@
 #   - https://pkgs.org/ - resource for finding needed packages
 #   - Ex: https://pkgs.org/search/?q=telepon
 #
-ARG ELIXIR_VERSION=1.18.4
-ARG OTP_VERSION=27.3.3
+ARG ELIXIR_VERSION=1.18.2
+ARG OTP_VERSION=27.2
 ARG DEBIAN_VERSION=bookworm-20250113-slim
 
 ARG BUILDER_IMAGE="hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION}"
@@ -38,6 +38,10 @@ RUN mix local.hex --force && \
 
 # set build ENV
 ENV MIX_ENV="prod"
+
+# Add Fluxon private Hex repository
+ARG FLUXON_LICENSE_KEY
+RUN mix hex.repo add fluxon https://repo.fluxonui.com --fetch-public-key SHA256:zF8zWamOWgokeJdiIYgRl91ZBmQYnyXlxIOp3ralbos --auth-key "${FLUXON_LICENSE_KEY}"
 
 # install mix dependencies
 COPY mix.exs mix.lock ./
@@ -73,8 +77,15 @@ RUN mix release
 FROM ${RUNNER_IMAGE}
 
 RUN apt-get update -y && \
-  apt-get install -y libstdc++6 openssl libncurses5 locales ca-certificates \
+  apt-get install -y libstdc++6 openssl libncurses5 locales ca-certificates curl gnupg \
   && apt-get clean && rm -f /var/lib/apt/lists/*_*
+
+# Install Doppler CLI
+RUN curl -sLf --retry 3 --tlsv1.2 --proto "=https" 'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' | gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg && \
+  echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | tee /etc/apt/sources.list.d/doppler-cli.list && \
+  apt-get update && \
+  apt-get install -y doppler && \
+  apt-get clean && rm -f /var/lib/apt/lists/*_*
 
 # Set the locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
@@ -88,6 +99,7 @@ RUN chown nobody /app
 
 # set runner ENV
 ENV MIX_ENV="prod"
+ENV HOME=/app
 
 # Only copy the final release from the build stage
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/playground ./
@@ -98,4 +110,6 @@ USER nobody
 # temporarily enable `--init` in your docker run command or add
 # temporary `tini` to your dockerfile. See Conditions for Automatic Restart.
 # https://github.com/krallin/tini?tab=readme-ov-file#building
-CMD ["/app/bin/server"]
+
+# Use Doppler to inject secrets at runtime
+CMD ["sh", "-c", "doppler run -- /app/bin/server"]

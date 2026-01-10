@@ -93,8 +93,19 @@ defmodule Playground.Workers.AIChatWorker do
   defp stream_ai_response(chat, message_history, user_id) do
     Logger.info("Streaming AI response: model=#{chat.model}, messages=#{length(message_history)}")
 
-    # Use OpenRouter service for streaming
-    case OpenRouter.stream_chat_completion(chat.model, message_history) do
+    # Build AI options from chat settings
+    ai_opts = [
+      temperature: chat.temperature,
+      max_tokens: chat.max_tokens,
+      top_p: chat.top_p,
+      frequency_penalty: chat.frequency_penalty,
+      presence_penalty: chat.presence_penalty
+    ]
+
+    Logger.debug("AI options: #{inspect(ai_opts)}")
+
+    # Use OpenRouter service for streaming with chat-specific settings
+    case OpenRouter.stream_chat_completion(chat.model, message_history, ai_opts) do
       {:ok, response} ->
         Logger.info("Stream started successfully")
 

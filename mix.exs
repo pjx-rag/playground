@@ -111,6 +111,9 @@ defmodule Playground.MixProject do
       # Analytics
       {:phoenix_analytics, "~> 0.4"},
 
+      # Vector Database (RAG)
+      {:pgvector, "~> 0.3"},
+
       # Utilities
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},

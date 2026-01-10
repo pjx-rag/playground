@@ -7,6 +7,7 @@ defmodule Playground.Accounts do
   alias Playground.Repo
 
   alias Playground.Accounts.{User, UserToken, UserNotifier}
+  alias Playground.Organizations
 
   ## Database getters
 
@@ -75,9 +76,23 @@ defmodule Playground.Accounts do
 
   """
   def register_user(attrs) do
-    %User{}
-    |> User.registration_changeset(attrs)
-    |> Repo.insert()
+    Repo.transaction(fn ->
+      # Create the user
+      user =
+        %User{}
+        |> User.registration_changeset(attrs)
+        |> Repo.insert!()
+
+      # Get PJX organization
+      pjx_org = Organizations.get_organization_by_name("PJX")
+
+      # Add user to PJX organization
+      if pjx_org do
+        Organizations.add_user_to_organization(pjx_org, user)
+      end
+
+      user
+    end)
   end
 
   @doc """

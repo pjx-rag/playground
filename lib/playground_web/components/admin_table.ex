@@ -12,7 +12,6 @@ defmodule PlaygroundWeb.Components.AdminTable do
 
   use Phoenix.Component
   import Fluxon.Components.Button
-  import Fluxon.Components.Checkbox
   import Fluxon.Components.Dropdown
 
   @doc """
@@ -132,7 +131,7 @@ defmodule PlaygroundWeb.Components.AdminTable do
                   :if={@show_checkboxes}
                   class="pl-4 sm:last:pr-1 px-3 py-2 text-left text-sm font-medium w-12"
                 >
-                  <.checkbox
+                  <.selection_checkbox
                     name="select-all"
                     phx-click="select_all_page"
                     phx-target={@target}
@@ -169,7 +168,7 @@ defmodule PlaygroundWeb.Components.AdminTable do
                     :if={@show_checkboxes}
                     class="pl-4 sm:last:pr-1 whitespace-nowrap py-2 px-3 w-12"
                   >
-                    <.checkbox
+                    <.selection_checkbox
                       name={"select-#{get_row_id(@row_id, row)}"}
                       phx-click="toggle_select"
                       phx-target={@target}
@@ -321,8 +320,10 @@ defmodule PlaygroundWeb.Components.AdminTable do
   defp get_row_id(row_id_fn, row) when is_function(row_id_fn), do: row_id_fn.(row)
 
   # Get current page size from meta
+  # Check flop.page_size first, then meta.page_size (which Flop sets from default_limit)
   defp get_current_page_size(%{flop: %{page_size: page_size}}) when is_integer(page_size), do: page_size
-  defp get_current_page_size(_meta), do: 10
+  defp get_current_page_size(%{page_size: page_size}) when is_integer(page_size), do: page_size
+  defp get_current_page_size(_meta), do: 25
 
   # Build page list with ellipsis for pagination
   # Shows: 1 ... current-1 current current+1 ... last
@@ -459,6 +460,27 @@ defmodule PlaygroundWeb.Components.AdminTable do
   defp icon(assigns) do
     ~H"""
     <span class={[@name, @class]} />
+    """
+  end
+
+  @doc """
+  A simple checkbox for table row selection that properly handles phx-click events.
+  Uses a label wrapper to ensure click events are properly captured.
+  """
+  attr :name, :string, required: true
+  attr :checked, :boolean, default: false
+  attr :rest, :global, include: ~w(phx-click phx-target phx-value-id)
+
+  defp selection_checkbox(assigns) do
+    ~H"""
+    <label class="inline-flex cursor-pointer" {@rest}>
+      <input
+        type="checkbox"
+        name={@name}
+        checked={@checked}
+        class="size-4 rounded border-input text-primary focus:ring-primary cursor-pointer pointer-events-none"
+      />
+    </label>
     """
   end
 end

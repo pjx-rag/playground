@@ -25,6 +25,13 @@ config :playground, :openrouter,
   api_key: System.get_env("OPENROUTER_API_KEY"),
   base_url: "https://openrouter.ai/api/v1"
 
+# Google Drive OAuth configuration (all environments)
+config :playground, :google_drive,
+  client_id: System.get_env("GOOGLE_DRIVE_CLIENT_ID"),
+  client_secret: System.get_env("GOOGLE_DRIVE_CLIENT_SECRET"),
+  redirect_uri:
+    System.get_env("GOOGLE_DRIVE_REDIRECT_URI") || "http://localhost:4000/auth/google_drive/callback"
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||
@@ -36,11 +43,9 @@ if config_env() == :prod do
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
   config :playground, Playground.Repo,
-    # ssl: true,
+    ssl: [verify: :verify_none],
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    # For machines with several cores, consider starting multiple pools of `pool_size`
-    # pool_count: 4,
     socket_options: maybe_ipv6
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
@@ -104,21 +109,16 @@ if config_env() == :prod do
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
 
-  # Mailer configuration (Resend)
-  resend_api_key =
-    System.get_env("RESEND_API_KEY") ||
-      raise """
-      environment variable RESEND_API_KEY is missing.
-      Get your API key from https://resend.com
-      """
+  # Mailer configuration (Resend) - optional
+  if resend_api_key = System.get_env("RESEND_API_KEY") do
+    config :playground, Playground.Mailer,
+      adapter: Resend.Swoosh.Adapter,
+      api_key: resend_api_key
 
-  config :playground, Playground.Mailer,
-    adapter: Resend.Swoosh.Adapter,
-    api_key: resend_api_key
-
-  # Configure the sender email
-  from_email = System.get_env("FROM_EMAIL") || "noreply@example.com"
-  config :playground, :from_email, from_email
+    # Configure the sender email
+    from_email = System.get_env("FROM_EMAIL") || "noreply@example.com"
+    config :playground, :from_email, from_email
+  end
 
   # Oban configuration for production
   # Note: crontab is inherited from config.exs (database backups, log cleanup)
@@ -159,8 +159,7 @@ if config_env() == :prod do
     bucket: tigris_bucket,
     region: "auto"
 
-  # PhoenixAnalytics configuration
+  # PhoenixAnalytics runtime configuration
   config :phoenix_analytics,
-    repo: Playground.Repo,
-    cache_ttl: :timer.minutes(10)
+    repo: Playground.Repo
 end

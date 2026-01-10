@@ -51,8 +51,8 @@ Hooks.ChatScroll = {
     this.isNearBottom = true
     this.scrollButton = document.getElementById('scroll-to-bottom')
 
-    // Scroll to bottom on initial load
-    this.scrollToBottom()
+    // Scroll to bottom on initial load with retry for content readiness
+    this.scrollToBottomWithRetry()
 
     // Track scroll position
     this.el.addEventListener('scroll', () => {
@@ -62,6 +62,21 @@ Hooks.ChatScroll = {
     // Listen for scroll-to-bottom event
     this.el.addEventListener('scroll-to-bottom', () => {
       this.scrollToBottom()
+    })
+
+    // Use MutationObserver to detect content changes (for streaming)
+    this.observer = new MutationObserver(() => {
+      if (this.isNearBottom) {
+        this.scrollToBottom()
+      } else {
+        this.showScrollButton()
+      }
+    })
+
+    this.observer.observe(this.el, {
+      childList: true,
+      subtree: true,
+      characterData: true
     })
   },
 
@@ -75,10 +90,27 @@ Hooks.ChatScroll = {
     }
   },
 
+  destroyed() {
+    if (this.observer) {
+      this.observer.disconnect()
+    }
+  },
+
   scrollToBottom() {
     this.el.scrollTop = this.el.scrollHeight
     this.hideScrollButton()
     this.isNearBottom = true
+  },
+
+  scrollToBottomWithRetry(attempts = 0) {
+    const maxAttempts = 20
+    const hasScrollableContent = this.el.scrollHeight > this.el.clientHeight
+
+    if (hasScrollableContent) {
+      this.scrollToBottom()
+    } else if (attempts < maxAttempts) {
+      setTimeout(() => this.scrollToBottomWithRetry(attempts + 1), 50)
+    }
   },
 
   checkScrollPosition() {

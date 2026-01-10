@@ -65,6 +65,8 @@ defmodule PlaygroundWeb.Layouts do
   attr :page_title, :string, default: nil, doc: "the page title"
   attr :breadcrumbs, :list, default: nil, doc: "breadcrumb items"
   attr :inner_content, :any, default: nil, doc: "inner content for live layouts"
+  attr :header_content, :any, default: nil, doc: "custom header content to replace breadcrumbs area"
+  attr :hide_header_padding, :boolean, default: false, doc: "hide padding around inner content"
 
   slot :inner_block
 
@@ -83,6 +85,8 @@ defmodule PlaygroundWeb.Layouts do
           _ -> @default_logo_url
         end
       end)
+      |> assign_new(:header_content, fn -> nil end)
+      |> assign_new(:hide_header_padding, fn -> false end)
 
     ~H"""
     <%= if @current_user do %>
@@ -102,7 +106,7 @@ defmodule PlaygroundWeb.Layouts do
         </div>
       </.sheet>
 
-      <div class="group/layout relative isolate flex min-h-svh w-full bg-base max-md:flex-col">
+      <div class="group/layout relative isolate flex h-svh w-full bg-base max-md:flex-col overflow-hidden">
         <!-- Desktop Sidebar -->
         <div
           id="desktop-sidebar"
@@ -140,7 +144,7 @@ defmodule PlaygroundWeb.Layouts do
 
         <!-- Main content area -->
         <main class={[
-          "flex flex-1 flex-col md:min-w-0 group-[[data-sidebar-transitioning]]/layout:transition-[padding] group-[[data-sidebar-transitioning]]/layout:duration-200",
+          "flex flex-1 flex-col md:min-w-0 overflow-hidden group-[[data-sidebar-transitioning]]/layout:transition-[padding] group-[[data-sidebar-transitioning]]/layout:duration-200",
           if(@sidebar_collapsed, do: "md:pl-20", else: "md:pl-64")
         ]}>
           <header class="bg-base sticky z-10 top-0 border-b border-base">
@@ -163,48 +167,54 @@ defmodule PlaygroundWeb.Layouts do
               </div>
             </div>
 
-            <%= if @breadcrumbs && length(@breadcrumbs) > 0 do %>
+            <%= if @header_content do %>
               <div class="px-4 sm:px-6 md:px-8 py-2 border-t border-base">
-                <nav aria-label="Breadcrumb" class="flex w-full overflow-x-auto">
-                  <ol role="list" class="flex items-center space-x-4 whitespace-nowrap">
-                    <li>
-                      <.link
-                        navigate={~p"/dashboard"}
-                        class="text-muted-foreground hover:text-foreground"
-                      >
-                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="size-5 shrink-0">
-                          <path d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd" fill-rule="evenodd" />
-                        </svg>
-                        <span class="sr-only">Home</span>
-                      </.link>
-                    </li>
-                    <%= for crumb <- @breadcrumbs |> Enum.reject(&(Map.get(&1, :label) in ["Home", "Dashboard"])) do %>
-                      <li>
-                        <div class="flex items-center">
-                          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="size-5 shrink-0 text-muted-foreground">
-                            <path d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd" />
-                          </svg>
-                          <%= if crumb[:path] do %>
-                            <.link navigate={crumb[:path]} class="ml-4 text-sm font-medium text-muted-foreground hover:text-foreground">
-                              {crumb[:label]}
-                            </.link>
-                          <% else %>
-                            <span aria-current="page" class="ml-4 text-sm font-medium text-muted-foreground">
-                              {crumb[:label]}
-                            </span>
-                          <% end %>
-                        </div>
-                      </li>
-                    <% end %>
-                  </ol>
-                </nav>
+                {@header_content}
               </div>
+            <% else %>
+              <%= if @breadcrumbs && length(@breadcrumbs) > 0 do %>
+                <div class="px-4 sm:px-6 md:px-8 py-2 border-t border-base">
+                  <nav aria-label="Breadcrumb" class="flex w-full overflow-x-auto">
+                    <ol role="list" class="flex items-center space-x-4 whitespace-nowrap">
+                      <li>
+                        <.link
+                          navigate={~p"/dashboard"}
+                          class="text-muted-foreground hover:text-foreground"
+                        >
+                          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="size-5 shrink-0">
+                            <path d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd" fill-rule="evenodd" />
+                          </svg>
+                          <span class="sr-only">Home</span>
+                        </.link>
+                      </li>
+                      <%= for crumb <- @breadcrumbs |> Enum.reject(&(Map.get(&1, :label) in ["Home", "Dashboard"])) do %>
+                        <li>
+                          <div class="flex items-center">
+                            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="size-5 shrink-0 text-muted-foreground">
+                              <path d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd" />
+                            </svg>
+                            <%= if crumb[:path] do %>
+                              <.link navigate={crumb[:path]} class="ml-4 text-sm font-medium text-muted-foreground hover:text-foreground">
+                                {crumb[:label]}
+                              </.link>
+                            <% else %>
+                              <span aria-current="page" class="ml-4 text-sm font-medium text-muted-foreground">
+                                {crumb[:label]}
+                              </span>
+                            <% end %>
+                          </div>
+                        </li>
+                      <% end %>
+                    </ol>
+                  </nav>
+                </div>
+              <% end %>
             <% end %>
           </header>
 
           <.flash_group flash={@flash} />
 
-          <div class="flex-1 flex flex-col p-4 md:p-6 min-h-0">
+          <div class={["flex-1 flex flex-col min-h-0 overflow-y-auto", unless(@hide_header_padding, do: "p-4 md:p-6")]}>
             <%= if @inner_content do %>
               {@inner_content}
             <% else %>

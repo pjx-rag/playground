@@ -16,7 +16,12 @@ config :playground, Oban,
     default: 10,
     mailers: 5,
     backups: 1,
-    ai_chat: 5
+    ai_chat: 5,
+    # RAG pipeline queues
+    process_text_file: 20,
+    process_pdf_file: 3,
+    process_office_file: 5,
+    embed_poller: 1
   ],
   repo: Playground.Repo,
   plugins: [
@@ -28,7 +33,11 @@ config :playground, Oban,
     # Database backup daily at 3:00 AM EST (8:00 AM UTC)
     {"0 8 * * *", Playground.Workers.DatabaseBackupWorker, args: %{}},
     # Clean up old API request logs daily at 4:00 AM UTC
-    {"0 4 * * *", Playground.Workers.APIRequestLogCleanupWorker, args: %{}}
+    {"0 4 * * *", Playground.Workers.APIRequestLogCleanupWorker, args: %{}},
+    # Refresh OAuth tokens every 5 minutes (proactive refresh before expiry)
+    {"*/5 * * * *", Playground.ApiTokens.Workers.TokenRefreshWorker, args: %{}}
+    # TODO: Add embedding poller cron job once EmbedChunksPollerWorker is implemented
+    # {"*/10 * * * *", Playground.RAG.Workers.EmbedChunksPollerWorker, args: %{}}
   ]
 
 config :playground,

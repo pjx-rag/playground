@@ -17,5 +17,9 @@ config :swoosh, local: false
 # Do not print debug messages in production
 config :logger, level: :info
 
+# PhoenixAnalytics compile-time configuration
+config :phoenix_analytics,
+  cache_ttl: :timer.minutes(10)
+
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

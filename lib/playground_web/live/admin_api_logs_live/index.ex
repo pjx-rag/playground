@@ -403,38 +403,42 @@ defmodule PlaygroundWeb.AdminAPILogsLive.Index do
                   <div>
                     <.label>Service</.label>
                     <.select
+                      clearable
                       name="service"
                       value={get_filter_value(@meta, "service")}
-                      options={[{"All services", ""} | Enum.map(@services, &{&1, &1})]}
+                      options={Enum.map(@services, &{&1, &1})}
+                      placeholder="All services"
                     />
                   </div>
 
                   <div>
                     <.label>Method</.label>
                     <.select
+                      clearable
                       name="method"
                       value={get_filter_value(@meta, "method")}
                       options={[
-                        {"All methods", ""},
                         {"GET", "GET"},
                         {"POST", "POST"},
                         {"PUT", "PUT"},
                         {"PATCH", "PATCH"},
                         {"DELETE", "DELETE"}
                       ]}
+                      placeholder="All methods"
                     />
                   </div>
 
                   <div>
                     <.label>Status</.label>
                     <.select
+                      clearable
                       name="success"
                       value={get_filter_value(@meta, "success")}
                       options={[
-                        {"All statuses", ""},
                         {"Success", "true"},
                         {"Failed", "false"}
                       ]}
+                      placeholder="All statuses"
                     />
                   </div>
 

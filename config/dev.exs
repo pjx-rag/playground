@@ -1,15 +1,25 @@
 import Config
 
 # Configure your database
-config :playground, Playground.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  port: 5555,
-  database: "playground_dev",
-  stacktrace: true,
-  show_sensitive_data_on_connection_error: true,
-  pool_size: 10
+# Use DATABASE_URL if set (e.g., for Neon), otherwise fall back to local config
+if database_url = System.get_env("DATABASE_URL") do
+  config :playground, Playground.Repo,
+    ssl: [verify: :verify_none],
+    url: database_url,
+    stacktrace: true,
+    show_sensitive_data_on_connection_error: true,
+    pool_size: 10
+else
+  config :playground, Playground.Repo,
+    username: "postgres",
+    password: "postgres",
+    hostname: "localhost",
+    port: 5555,
+    database: "playground_dev",
+    stacktrace: true,
+    show_sensitive_data_on_connection_error: true,
+    pool_size: 10
+end
 
 # For development, we disable any cache and enable
 # debugging and code reloading.

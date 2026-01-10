@@ -1,48 +1,13 @@
-<div class="flex flex-col h-[calc(100vh-8rem)]">
+<div class="flex flex-col h-[calc(100svh-8rem)] md:h-[calc(100svh-7.25rem)]">
   <%!-- Main Chat Area --%>
-  <div class="flex-1 flex flex-col min-w-0">
-    <%!-- Chat Header - always visible --%>
-    <div class="border-b border-base px-4 md:px-6 py-3 md:py-4 bg-card">
-      <div class="flex items-center justify-between">
-        <div class="flex-1 min-w-0 mr-4">
-          <%= if @current_chat do %>
-            <%= if @viewed_user_id == @current_user.id do %>
-              <.form for={%{}} phx-change="rename_chat" class="contents">
-                <input
-                  type="text"
-                  name="title"
-                  value={@current_chat.title}
-                  phx-debounce="300"
-                  class="text-lg md:text-xl font-semibold text-foreground bg-transparent border-0 border-b border-transparent hover:border-base focus:border-primary focus:ring-0 w-full px-0 py-0 transition-colors"
-                />
-              </.form>
-            <% else %>
-              <h1 class="text-lg md:text-xl font-semibold text-foreground">{@current_chat.title}</h1>
-            <% end %>
-            <p class="text-xs md:text-sm text-muted-foreground truncate">{@current_chat.model}</p>
-          <% else %>
-            <h1 class="text-lg md:text-xl font-semibold text-foreground">AI Chat</h1>
-            <p class="text-xs md:text-sm text-muted-foreground">Select or create a chat</p>
-          <% end %>
-        </div>
-        <%!-- Toggle sidebar button - always visible --%>
-        <.button
-          variant="ghost"
-          size="sm"
-          phx-click={Fluxon.open_dialog("chat-history-sheet")}
-        >
-          <.icon name="hero-bars-3" class="size-5" />
-        </.button>
-      </div>
-    </div>
-
+  <div class="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
     <%= if @current_chat do %>
 
       <%!-- Messages Area --%>
       <div class="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-4 relative" id="messages-container" phx-hook="ChatScroll">
         <%= for message <- @messages do %>
           <div class={"flex #{if message.role == "user", do: "justify-end", else: "justify-start"}"}>
-            <div class={"max-w-[85%] md:max-w-3xl px-4 py-3 #{if message.role == "user", do: "bg-primary text-primary-foreground rounded-2xl rounded-br-sm", else: "bg-card border border-base text-foreground shadow-sm rounded-2xl rounded-bl-sm"}"}>
+            <div class={"max-w-[85%] md:max-w-3xl px-4 py-3 #{if message.role == "user", do: "bg-primary text-foreground-primary rounded-2xl rounded-br-sm", else: "bg-card border border-base text-foreground shadow-sm rounded-2xl rounded-bl-sm"}"}>
               <%= if message.role == "assistant" do %>
                 <div class="prose prose-sm max-w-none dark:prose-invert">
                   {raw(MDEx.to_html!(message.content, sanitize: true))}
@@ -74,7 +39,7 @@
         <%!-- Scroll to bottom button --%>
         <button
           id="scroll-to-bottom"
-          class="hidden sticky bottom-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-lg hover:bg-primary/90 transition-all z-10"
+          class="hidden sticky bottom-4 left-1/2 -translate-x-1/2 bg-primary text-foreground-primary px-4 py-2 rounded-full shadow-lg hover:bg-primary/90 transition-all z-10"
           phx-click={JS.dispatch("scroll-to-bottom", to: "#messages-container")}
         >
           <.icon name="hero-arrow-down" class="size-4 mr-1 inline" />
@@ -82,8 +47,8 @@
         </button>
       </div>
 
-      <%!-- Input Area --%>
-      <div class="border-t border-base px-4 md:px-6 py-3 md:py-4 bg-card">
+      <%!-- Input Area - sticky --%>
+      <div class="sticky bottom-0 z-10 border-t border-base px-4 md:px-6 py-3 md:py-4 bg-card">
         <%= if @viewed_user_id == @current_user.id do %>
           <%!-- Rate Limit Display (hidden on mobile for space) --%>
           <div class="hidden md:block mb-2 text-xs text-muted-foreground">
@@ -132,7 +97,7 @@
               variant="solid"
               color="primary"
               size="lg"
-              phx-click={Fluxon.open_dialog("chat-history-sheet")}
+              phx-click="new_chat"
             >
               <.icon name="hero-plus" class="size-5 mr-2" />
               New Chat
@@ -144,85 +109,172 @@
   </div>
 </div>
 
-<%!-- Chat History Sheet --%>
+<%!-- Chat History & Settings Sheet --%>
 <.sheet id="chat-history-sheet" placement="right" class="w-full max-w-sm">
-  <h2 class="text-lg font-semibold text-foreground mb-4">Chat History</h2>
-
-  <%!-- Admin User Selector --%>
-  <%= if @is_admin do %>
-    <div class="mb-4">
-      <.label class="mb-1">Viewing chats for:</.label>
-      <.select
-        name="user_id"
-        value={cond do
-          @viewed_user_id == @current_user.id -> ""
-          is_nil(@viewed_user_id) -> "all"
-          true -> @viewed_user_id
-        end}
-        options={[
-          {"#{@current_user.email} (You)", ""},
-          {"All Users", "all"}
-        ] ++ Enum.map(Enum.filter(@available_users, & &1.id != @current_user.id), &{&1.email, &1.id})}
-        phx-change="change_viewed_user"
-      />
-    </div>
-  <% end %>
-
-  <%!-- Model Selector and New Chat Button --%>
-  <%= if @viewed_user_id == @current_user.id do %>
-    <div class="space-y-2 mb-4">
-      <.label class="text-xs">Model:</.label>
-      <.form for={%{}} phx-change="change_model">
-        <.select
-          name="model"
-          value={@selected_model}
-          options={@available_models}
-          searchable
-          search_input_placeholder="Search models..."
-        />
-      </.form>
-      <.button
-        variant="solid"
-        color="primary"
-        class="w-full"
-        phx-click={JS.push("new_chat") |> Fluxon.close_dialog("chat-history-sheet")}
-      >
-        <.icon name="hero-plus" class="size-4 mr-2" />
-        New Chat
-      </.button>
-    </div>
-  <% end %>
-
-  <%!-- Chat List --%>
-  <div class="space-y-2">
-    <%= for chat <- @chats do %>
-      <div
-        class={"group relative px-3 py-2 rounded-base cursor-pointer transition-colors #{if @current_chat && @current_chat.id == chat.id, do: "bg-primary text-primary-foreground", else: "bg-overlay hover:bg-muted text-foreground"}"}
-      >
-        <div
-          phx-click={JS.push("select_chat", value: %{chat_id: chat.id}) |> Fluxon.close_dialog("chat-history-sheet")}
+  <div class="flex flex-col h-full pt-6">
+    <%!-- Header with New Chat button --%>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-foreground">Chats</h2>
+      <%= if @viewed_user_id == @current_user.id do %>
+        <.button
+          variant="solid"
+          color="primary"
+          size="sm"
+          phx-click={JS.push("new_chat") |> Fluxon.close_dialog("chat-history-sheet")}
         >
-          <div class="flex items-center justify-between">
-            <span class="truncate flex-1 pr-8">{chat.title}</span>
-            <%= if chat.is_processing do %>
-              <span class="text-xs ml-2 animate-pulse">●</span>
+          <.icon name="hero-plus" class="size-4 mr-1" />
+          New Chat
+        </.button>
+      <% end %>
+    </div>
+
+    <%!-- Admin User Selector --%>
+    <%= if @is_admin do %>
+      <div class="mb-4">
+        <.label class="mb-1 text-xs">Viewing chats for:</.label>
+        <.select
+          name="user_id"
+          value={cond do
+            @viewed_user_id == @current_user.id -> ""
+            is_nil(@viewed_user_id) -> "all"
+            true -> @viewed_user_id
+          end}
+          options={[
+            {"#{@current_user.email} (You)", ""},
+            {"All Users", "all"}
+          ] ++ Enum.map(Enum.filter(@available_users, & &1.id != @current_user.id), &{&1.email, &1.id})}
+          phx-change="change_viewed_user"
+        />
+      </div>
+    <% end %>
+
+    <%!-- Chat List --%>
+    <div class="flex-1 overflow-y-auto space-y-2 mb-4">
+      <%= if length(@chats) == 0 do %>
+        <p class="text-sm text-muted-foreground text-center py-4">No chats yet</p>
+      <% else %>
+        <%= for chat <- @chats do %>
+          <div
+            class={"group relative px-3 py-2 rounded-base cursor-pointer transition-colors #{if @current_chat && @current_chat.id == chat.id, do: "bg-primary text-foreground-primary", else: "bg-overlay hover:bg-muted text-foreground"}"}
+          >
+            <div
+              phx-click={JS.push("select_chat", value: %{chat_id: chat.id}) |> Fluxon.close_dialog("chat-history-sheet")}
+            >
+              <div class="flex items-center justify-between">
+                <span class="truncate flex-1 pr-8">{chat.title}</span>
+                <%= if chat.is_processing do %>
+                  <span class="text-xs ml-2 animate-pulse">●</span>
+                <% end %>
+              </div>
+              <div class="text-xs opacity-70 mt-1">
+                {Calendar.strftime(chat.updated_at, "%b %d, %I:%M %p")}
+              </div>
+            </div>
+            <%!-- Delete button --%>
+            <%= if @viewed_user_id == @current_user.id do %>
+              <button
+                phx-click="delete_chat"
+                phx-value-chat_id={chat.id}
+                data-confirm="Are you sure you want to delete this chat?"
+                class={"absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-base #{if @current_chat && @current_chat.id == chat.id, do: "text-foreground-primary hover:bg-primary-foreground/20", else: "text-danger hover:bg-danger/10"}"}
+              >
+                <.icon name="hero-trash" class="size-4" />
+              </button>
             <% end %>
           </div>
-          <div class="text-xs opacity-70 mt-1">
-            {Calendar.strftime(chat.updated_at, "%b %d, %I:%M %p")}
-          </div>
-        </div>
-        <%!-- Delete button --%>
-        <%= if @viewed_user_id == @current_user.id do %>
-          <button
-            phx-click="delete_chat"
-            phx-value-chat_id={chat.id}
-            data-confirm="Are you sure you want to delete this chat?"
-            class={"absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-base #{if @current_chat && @current_chat.id == chat.id, do: "text-primary-foreground hover:bg-primary-foreground/20", else: "text-danger hover:bg-danger/10"}"}
-          >
-            <.icon name="hero-trash" class="size-4" />
-          </button>
         <% end %>
+      <% end %>
+    </div>
+
+    <%!-- Admin AI Settings Section --%>
+    <%= if @is_admin do %>
+      <div class="border-t border-base pt-4">
+        <h3 class="text-sm font-semibold text-foreground mb-2 flex items-center">
+          <.icon name="hero-cog-6-tooth" class="size-4 mr-2" />
+          AI Default Settings
+        </h3>
+        <p class="text-xs text-muted-foreground mb-3">
+          These settings apply to all new chats. Changes are saved immediately.
+        </p>
+
+        <.form for={%{}} phx-change="update_ai_settings" class="space-y-3">
+          <div>
+            <.label class="text-xs mb-1">Default Model</.label>
+            <.select
+              name="default_model"
+              value={@ai_settings.default_model}
+              options={@available_models}
+              searchable
+              search_input_placeholder="Search models..."
+            />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <.label class="text-xs mb-1">Temperature</.label>
+              <.input
+                type="number"
+                name="temperature"
+                value={@ai_settings.temperature}
+                step="0.1"
+                min="0"
+                max="2"
+                phx-debounce="500"
+              />
+            </div>
+            <div>
+              <.label class="text-xs mb-1">Max Tokens</.label>
+              <.input
+                type="number"
+                name="max_tokens"
+                value={@ai_settings.max_tokens}
+                step="256"
+                min="1"
+                max="128000"
+                phx-debounce="500"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <.label class="text-xs mb-1">Top P</.label>
+              <.input
+                type="number"
+                name="top_p"
+                value={@ai_settings.top_p}
+                step="0.1"
+                min="0"
+                max="1"
+                phx-debounce="500"
+              />
+            </div>
+            <div>
+              <.label class="text-xs mb-1">Freq Pen</.label>
+              <.input
+                type="number"
+                name="frequency_penalty"
+                value={@ai_settings.frequency_penalty}
+                step="0.1"
+                min="-2"
+                max="2"
+                phx-debounce="500"
+              />
+            </div>
+            <div>
+              <.label class="text-xs mb-1">Pres Pen</.label>
+              <.input
+                type="number"
+                name="presence_penalty"
+                value={@ai_settings.presence_penalty}
+                step="0.1"
+                min="-2"
+                max="2"
+                phx-debounce="500"
+              />
+            </div>
+          </div>
+        </.form>
       </div>
     <% end %>
   </div>

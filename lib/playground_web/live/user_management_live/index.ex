@@ -305,9 +305,9 @@ defmodule PlaygroundWeb.UserManagementLive.Index do
   end
 
   defp status_filter_options do
-    [{"All statuses", ""} | Enum.map(User.states(), fn state ->
+    Enum.map(User.states(), fn state ->
       {User.state_name(state), state}
-    end)]
+    end)
   end
 
   @impl true
@@ -384,9 +384,11 @@ defmodule PlaygroundWeb.UserManagementLive.Index do
                   <div>
                     <.label>Status</.label>
                     <.select
+                      clearable
                       name="status"
                       value={get_filter_value(@meta, "status")}
                       options={status_filter_options()}
+                      placeholder="All statuses"
                     />
                   </div>
 

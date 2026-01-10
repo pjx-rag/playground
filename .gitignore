@@ -10,6 +10,9 @@
 # Where 3rd-party dependencies like ExDoc output generated docs.
 /doc/
 
+# Custom documentation directory
+/docs/
+
 # Ignore .fetch files in case you like to edit your project deps locally.
 /.fetch
 
@@ -37,6 +40,10 @@ npm-debug.log
 
 # Environment files (keep .env.example, ignore .env with secrets)
 .env
+
+# Doppler local config (secrets managed in Doppler cloud)
+doppler.yaml
+.doppler.yaml
 
 # Claude Code files
 .claude/

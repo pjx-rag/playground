@@ -3,7 +3,7 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = "playground-app"
+app = "playground-staging"
 primary_region = "iad"
 kill_signal = "SIGTERM"
 kill_timeout = "5s"
@@ -11,10 +11,9 @@ kill_timeout = "5s"
 [build]
 
 [deploy]
-  release_command = "/app/bin/migrate"
+  release_command = "sh -c 'doppler run -- /app/bin/migrate'"
 
 [env]
-  PHX_HOST = "playground-app.fly.dev"
   PORT = "8080"
   ECTO_IPV6 = "true"
 

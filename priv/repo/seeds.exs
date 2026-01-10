@@ -12,11 +12,37 @@
 
 alias Playground.Accounts
 alias Playground.Authorization
+alias Playground.Organizations
+alias Playground.Settings
 
 # Setup authorization roles and permissions
 IO.puts("Setting up authorization...")
 Authorization.setup!()
 IO.puts("Authorization setup complete!")
+
+# Seed default themes and app settings
+IO.puts("Seeding default themes...")
+Settings.seed_default_themes()
+IO.puts("Default themes seeded!")
+
+IO.puts("Seeding default app settings...")
+Settings.seed_default_app_settings()
+IO.puts("Default app settings seeded!")
+
+# Create PJX organization
+IO.puts("Creating PJX organization...")
+
+pjx_org =
+  case Organizations.get_organization_by_name("PJX") do
+    nil ->
+      {:ok, org} = Organizations.create_organization(%{name: "PJX"})
+      IO.puts("PJX organization created!")
+      org
+
+    existing_org ->
+      IO.puts("PJX organization already exists.")
+      existing_org
+  end
 
 # Create admin user if it doesn't exist
 admin_email = System.get_env("ADMIN_EMAIL", "admin@example.com")
@@ -34,24 +60,32 @@ case Accounts.get_user_by_email(admin_email) do
         last_name: "User"
       })
 
-    # Confirm the user immediately using state machine
-    {:ok, user} =
-      Machinery.transition_to(
-        user,
-        Playground.Accounts.User,
-        "confirmed",
-        %{}
-      )
+    # Confirm the user immediately
+    # In production releases, Machinery supervision tree may not be started,
+    # so we directly update the status field instead of using transition_to
+    user = Playground.Repo.update!(Ecto.Changeset.change(user, status: "confirmed"))
 
     # Grant admin role
     Authorization.grant_admin(user)
-    IO.puts("Admin user created and confirmed!")
+
+    # Add user to PJX organization
+    Organizations.add_user_to_organization(pjx_org, user)
+    IO.puts("Admin user created, confirmed, and added to PJX organization!")
 
   existing_user ->
     IO.puts("Admin user already exists: #{admin_email}")
     # Ensure admin role is granted
     Authorization.grant_admin(existing_user)
-    IO.puts("Admin role ensured for existing user.")
+
+    # Ensure user is in PJX organization
+    case Organizations.get_user_organization(existing_user) do
+      nil ->
+        Organizations.add_user_to_organization(pjx_org, existing_user)
+        IO.puts("Admin role ensured and user added to PJX organization.")
+
+      _org ->
+        IO.puts("Admin role ensured and user already in organization.")
+    end
 end
 
 IO.puts("Seeds completed!")

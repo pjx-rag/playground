@@ -16,6 +16,7 @@ defmodule PlaygroundWeb.AIChatLive do
   alias Playground.Accounts
   alias Playground.Authorization
   alias Playground.Services.OpenRouter
+  alias Playground.Settings
 
   require Logger
 
@@ -47,6 +48,9 @@ defmodule PlaygroundWeb.AIChatLive do
     # Fetch available AI models from OpenRouter API
     available_models = fetch_available_models()
 
+    # Load AI default settings for admin panel
+    ai_settings = load_ai_settings()
+
     {:ok,
      socket
      |> assign(:current_user, current_user)
@@ -55,7 +59,8 @@ defmodule PlaygroundWeb.AIChatLive do
      |> assign(:viewed_user, viewed_user)
      |> assign(:available_users, available_users)
      |> assign(:available_models, available_models)
-     |> assign(:selected_model, default_model(available_models))
+     |> assign(:selected_model, ai_settings.default_model)
+     |> assign(:ai_settings, ai_settings)
      |> assign(:chats, chats)
      |> assign(:current_chat, nil)
      |> assign(:messages, [])
@@ -63,7 +68,9 @@ defmodule PlaygroundWeb.AIChatLive do
      |> assign(:streaming_content, "")
      |> assign(:is_streaming, false)
      |> assign(:rate_limit, rate_limit)
-     |> assign(:page_title, "AI Chat")}
+     |> assign(:page_title, "AI Chat")
+     |> assign(:hide_header_padding, true)
+     |> assign_header_content()}
   end
 
   @impl true
@@ -119,7 +126,8 @@ defmodule PlaygroundWeb.AIChatLive do
      socket
      |> assign(:viewed_user_id, viewed_user_id)
      |> assign(:viewed_user, viewed_user)
-     |> assign(:chats, chats)}
+     |> assign(:chats, chats)
+     |> assign_header_content()}
   end
 
   @impl true
@@ -184,12 +192,13 @@ defmodule PlaygroundWeb.AIChatLive do
   def handle_event("new_chat", _params, socket) do
     current_user = socket.assigns.current_user
     viewed_user_id = socket.assigns.viewed_user_id
-    selected_model = socket.assigns.selected_model
-    Logger.info("Creating new chat with model: #{selected_model}")
+    # Use the default model from app settings
+    default_model = socket.assigns.ai_settings.default_model
+    Logger.info("Creating new chat with default model: #{default_model}")
 
     # Can only create chats for own account
     if viewed_user_id == current_user.id do
-      case AI.create_chat(current_user, %{title: "New Chat", model: selected_model}) do
+      case AI.create_chat(current_user, %{title: "New Chat", model: default_model}) do
         {:ok, chat} ->
           {:noreply,
            socket
@@ -204,23 +213,55 @@ defmodule PlaygroundWeb.AIChatLive do
   end
 
   @impl true
-  def handle_event("change_model", params, socket) do
-    Logger.debug("change_model event received: #{inspect(params)}")
-    requested_model = params["model"] || params["value"]
-    
-    # Validate that the requested model exists in available models
-    available_model_ids = Enum.map(socket.assigns.available_models, fn {_label, id} -> id end)
-    
-    model = 
-      if requested_model && requested_model in available_model_ids do
-        Logger.info("Selected model: #{requested_model}")
-        requested_model
-      else
-        Logger.warning("Invalid model requested: #{inspect(requested_model)}, keeping current: #{socket.assigns.selected_model}")
-        socket.assigns.selected_model
+  def handle_event("update_ai_settings", params, socket) do
+    # Admin only - update app settings
+    if socket.assigns.is_admin do
+      Logger.debug("Updating AI settings: #{inspect(params)}")
+
+      # Update each setting that was provided
+      if model = params["default_model"] do
+        available_model_ids = Enum.map(socket.assigns.available_models, fn {_label, id} -> id end)
+
+        if model in available_model_ids do
+          Settings.set_app_setting("ai_default_model", model)
+        end
       end
-    
-    {:noreply, assign(socket, :selected_model, model)}
+
+      case params["temperature"] do
+        value when value not in [nil, ""] -> Settings.set_app_setting("ai_temperature", value)
+        _ -> :ok
+      end
+
+      case params["max_tokens"] do
+        value when value not in [nil, ""] -> Settings.set_app_setting("ai_max_tokens", value)
+        _ -> :ok
+      end
+
+      case params["top_p"] do
+        value when value not in [nil, ""] -> Settings.set_app_setting("ai_top_p", value)
+        _ -> :ok
+      end
+
+      case params["frequency_penalty"] do
+        value when value not in [nil, ""] -> Settings.set_app_setting("ai_frequency_penalty", value)
+        _ -> :ok
+      end
+
+      case params["presence_penalty"] do
+        value when value not in [nil, ""] -> Settings.set_app_setting("ai_presence_penalty", value)
+        _ -> :ok
+      end
+
+      # Reload settings
+      ai_settings = load_ai_settings()
+
+      {:noreply,
+       socket
+       |> assign(:ai_settings, ai_settings)
+       |> assign(:selected_model, ai_settings.default_model)}
+    else
+      {:noreply, socket |> put_flash(:error, "Only admins can change AI settings")}
+    end
   end
 
   @impl true
@@ -240,7 +281,8 @@ defmodule PlaygroundWeb.AIChatLive do
           {:noreply,
            socket
            |> assign(:current_chat, updated_chat)
-           |> assign(:chats, chats)}
+           |> assign(:chats, chats)
+           |> assign_header_content()}
 
         {:error, _changeset} ->
           {:noreply, socket |> put_flash(:error, "Failed to rename chat")}
@@ -413,6 +455,53 @@ defmodule PlaygroundWeb.AIChatLive do
     end
   end
 
-  defp default_model([{_label, id} | _]), do: id
-  defp default_model(_), do: "mistralai/devstral-2512:free"
+  defp load_ai_settings do
+    %{
+      default_model: Settings.get_app_setting_value("ai_default_model", "mistralai/devstral-2512:free"),
+      temperature: Settings.get_app_setting_value("ai_temperature", "0.7"),
+      max_tokens: Settings.get_app_setting_value("ai_max_tokens", "4096"),
+      top_p: Settings.get_app_setting_value("ai_top_p", "1.0"),
+      frequency_penalty: Settings.get_app_setting_value("ai_frequency_penalty", "0.0"),
+      presence_penalty: Settings.get_app_setting_value("ai_presence_penalty", "0.0")
+    }
+  end
+
+  defp assign_header_content(socket) do
+    assigns = socket.assigns
+
+    header_content = ~H"""
+    <div class="flex items-center justify-between">
+      <div class="flex-1 min-w-0 mr-4">
+        <%= if @current_chat do %>
+          <%= if @viewed_user_id == @current_user.id do %>
+            <.form for={%{}} phx-change="rename_chat" phx-submit="rename_chat" class="contents">
+              <input
+                type="text"
+                name="title"
+                value={@current_chat.title}
+                phx-debounce="300"
+                class="text-sm font-medium text-foreground bg-transparent border-0 border-b border-transparent hover:border-base focus:border-primary focus:ring-0 w-full max-w-md px-0 py-0 transition-colors"
+              />
+            </.form>
+          <% else %>
+            <span class="text-sm font-medium text-foreground">{@current_chat.title}</span>
+          <% end %>
+          <span class="text-xs text-muted-foreground ml-2">({@current_chat.model})</span>
+        <% else %>
+          <span class="text-sm text-muted-foreground">Select or create a chat</span>
+        <% end %>
+      </div>
+      <.button
+        variant="ghost"
+        size="sm"
+        phx-click={Fluxon.open_dialog("chat-history-sheet")}
+      >
+        <.icon name="hero-bars-3" class="size-5" />
+        <span class="sr-only">Chat history</span>
+      </.button>
+    </div>
+    """
+
+    assign(socket, :header_content, header_content)
+  end
 end
