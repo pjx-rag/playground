@@ -8,6 +8,14 @@ defmodule Playground.RAG.Chunk do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @derive {
+    Flop.Schema,
+    filterable: [:file_id, :revision],
+    sortable: [:position, :inserted_at],
+    default_limit: 50,
+    default_order: %{order_by: [:position], order_directions: [:asc]}
+  }
+
   schema "chunks" do
     belongs_to :file, Playground.Files.File
 
@@ -26,6 +34,9 @@ defmodule Playground.RAG.Chunk do
     # Optional but recommended for citations/order
     field :start_byte, :integer
     field :end_byte, :integer
+
+    # Virtual field for UI display
+    field :has_embedding, :boolean, virtual: true
 
     timestamps(type: :utc_datetime)
   end
