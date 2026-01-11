@@ -1,605 +1,93 @@
 defmodule Playground.AI do
   @moduledoc """
-  The AI context for managing chat conversations and messages.
+  The AI context facade.
 
-  Provides functions for:
-  - Creating and managing chats
-  - Sending messages and enqueueing AI responses
-  - Rate limiting per user
-  - Admin oversight (viewing all users' chats)
-  - Cost tracking and analytics
+  Delegates to domain-specific mini-contexts:
+  - `AI.Chats` - Chat operations (create, update, delete, list)
+  - `AI.Messages` - Message operations (create user/assistant messages)
+  - `AI.RateLimiting` - Rate limit checking and tracking
+  - `AI.Analytics` - Cost tracking and statistics
+
+  This facade provides a clean public API while keeping implementation
+  details organized into focused, manageable modules.
   """
 
-  import Ecto.Query, warn: false
-  alias Playground.Repo
-  alias Playground.AI.{Chat, Message, RequestTracking}
-  alias Playground.Accounts.User
-  alias Playground.Authorization
-  alias Playground.Settings
+  alias Playground.AI.{Chats, Messages, RateLimiting, Analytics}
 
   # ============================================================================
-  # Chat Functions
+  # Chat Functions - Delegate to AI.Chats
   # ============================================================================
 
-  @doc """
-  Returns the list of chats for a user, with admin override support.
+  @doc "See `AI.Chats.list_for_user/2`"
+  defdelegate list_user_chats(user_id, current_user), to: Chats, as: :list_for_user
 
-  ## Parameters
-    - user_id: ID of the user whose chats to fetch
-    - current_user: The user making the request (for authorization)
+  @doc "See `AI.Chats.list_all/1`"
+  defdelegate list_all_chats(current_user), to: Chats, as: :list_all
 
-  ## Examples
+  @doc "See `AI.Chats.get!/2`"
+  defdelegate get_chat!(id, user_id), to: Chats, as: :get!
 
-      iex> list_user_chats(user_id, current_user)
-      [%Chat{}, ...]
+  @doc "See `AI.Chats.get_for_admin!/2`"
+  defdelegate get_chat_for_admin!(id, admin), to: Chats, as: :get_for_admin!
 
-  """
-  def list_user_chats(user_id, %User{} = current_user) do
-    cond do
-      # User viewing their own chats
-      current_user.id == user_id ->
-        from(c in Chat,
-          where: c.user_id == ^user_id,
-          order_by: [desc: c.updated_at]
-        )
-        |> Repo.all()
+  @doc "See `AI.Chats.create/2`"
+  defdelegate create_chat(user, attrs \\ %{}), to: Chats, as: :create
 
-      # Admin viewing another user's chats
-      Authorization.can?(current_user, "ai_chat:view_all") ->
-        from(c in Chat,
-          where: c.user_id == ^user_id,
-          order_by: [desc: c.updated_at],
-          preload: [:user]
-        )
-        |> Repo.all()
+  @doc "See `AI.Chats.update/2`"
+  defdelegate update_chat(chat, attrs), to: Chats, as: :update
 
-      # Unauthorized
-      true ->
-        []
-    end
-  end
+  @doc "See `AI.Chats.delete/2`"
+  defdelegate delete_chat(chat, user), to: Chats, as: :delete
 
-  @doc """
-  Returns all chats across all users (admin only).
-  """
-  def list_all_chats(%User{} = current_user) do
-    if Authorization.can?(current_user, "ai_chat:view_all") do
-      from(c in Chat,
-        order_by: [desc: c.updated_at],
-        preload: [:user]
-      )
-      |> Repo.all()
-    else
-      []
-    end
-  end
+  @doc "See `AI.Chats.change/2`"
+  defdelegate change_chat(chat, attrs \\ %{}), to: Chats, as: :change
 
-  @doc """
-  Gets a single chat with authorization check.
+  @doc "See `AI.Chats.auto_generate_title/1`"
+  defdelegate auto_generate_chat_title(chat), to: Chats, as: :auto_generate_title
 
-  Raises `Ecto.NoResultsError` if the Chat does not exist or user is not authorized.
-  """
-  def get_chat!(id, user_id) do
-    from(c in Chat,
-      where: c.id == ^id and c.user_id == ^user_id,
-      preload: [:user]
-    )
-    |> Repo.one!()
-  end
-
-  @doc """
-  Gets a single chat for admin viewing (no user_id check).
-  """
-  def get_chat_for_admin!(id, %User{} = admin) do
-    if Authorization.can?(admin, "ai_chat:view_all") do
-      Repo.get!(Chat, id) |> Repo.preload(:user)
-    else
-      raise Ecto.NoResultsError, queryable: Chat
-    end
-  end
-
-  @doc """
-  Creates a chat with AI settings from app defaults.
-
-  ## Examples
-
-      iex> create_chat(user, %{title: "New conversation", model: "gpt-4"})
-      {:ok, %Chat{}}
-
-      iex> create_chat(user, %{title: nil})
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def create_chat(%User{} = user, attrs \\ %{}) do
-    # Get AI defaults from app settings
-    defaults = get_ai_defaults()
-
-    # Merge defaults with provided attrs (attrs take precedence)
-    merged_attrs = Map.merge(defaults, stringify_keys(attrs))
-
-    %Chat{user_id: user.id}
-    |> Chat.changeset(merged_attrs)
-    |> Repo.insert()
-  end
-
-  defp get_ai_defaults do
-    %{
-      "temperature" => parse_float(Settings.get_app_setting_value("ai_temperature", "0.7")),
-      "max_tokens" => parse_integer(Settings.get_app_setting_value("ai_max_tokens", "4096")),
-      "top_p" => parse_float(Settings.get_app_setting_value("ai_top_p", "1.0")),
-      "frequency_penalty" => parse_float(Settings.get_app_setting_value("ai_frequency_penalty", "0.0")),
-      "presence_penalty" => parse_float(Settings.get_app_setting_value("ai_presence_penalty", "0.0"))
-    }
-  end
-
-  defp stringify_keys(map) when is_map(map) do
-    Map.new(map, fn {k, v} -> {to_string(k), v} end)
-  end
-
-  defp parse_float(value) when is_binary(value) do
-    case Float.parse(value) do
-      {float, _} -> float
-      :error -> 0.0
-    end
-  end
-
-  defp parse_float(value) when is_float(value), do: value
-  defp parse_float(value) when is_integer(value), do: value / 1
-  defp parse_float(_), do: 0.0
-
-  defp parse_integer(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, _} -> int
-      :error -> 4096
-    end
-  end
-
-  defp parse_integer(value) when is_integer(value), do: value
-  defp parse_integer(_), do: 4096
-
-  @doc """
-  Updates a chat with the given attributes.
-
-  ## Examples
-
-      iex> update_chat(chat, %{title: "Updated Title"})
-      {:ok, %Chat{}}
-
-      iex> update_chat(chat, %{title: nil})
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def update_chat(%Chat{} = chat, attrs) do
-    chat
-    |> Chat.changeset(attrs)
-    |> Repo.update()
-  end
-
-  @doc """
-  Deletes a chat (cascades to messages).
-  """
-  def delete_chat(%Chat{} = chat, %User{} = user) do
-    # Verify ownership or admin
-    if chat.user_id == user.id or Authorization.can?(user, "ai_chat:view_all") do
-      Repo.delete(chat)
-    else
-      {:error, :unauthorized}
-    end
-  end
-
-  @doc """
-  Returns an `%Ecto.Changeset{}` for tracking chat changes.
-  """
-  def change_chat(%Chat{} = chat, attrs \\ %{}) do
-    Chat.changeset(chat, attrs)
-  end
-
-  @doc """
-  Auto-generates a chat title from the first user message.
-  Takes the first 50 characters of the first message.
-  """
-  def auto_generate_chat_title(%Chat{} = chat) do
-    first_message =
-      from(m in Message,
-        where: m.chat_id == ^chat.id and m.role == "user",
-        order_by: [asc: m.inserted_at],
-        limit: 1
-      )
-      |> Repo.one()
-
-    if first_message do
-      title =
-        first_message.content
-        |> String.slice(0, 50)
-        |> String.trim()
-        |> then(fn s -> if String.length(first_message.content) > 50, do: s <> "...", else: s end)
-
-      update_chat(chat, %{title: title})
-    else
-      {:ok, chat}
-    end
-  end
+  @doc "See `AI.Chats.clear_processing_flag/1`"
+  defdelegate clear_processing_flag(chat), to: Chats, as: :clear_processing_flag
 
   # ============================================================================
-  # Message Functions
+  # Message Functions - Delegate to AI.Messages
   # ============================================================================
 
-  @doc """
-  Lists messages for a chat with optional pagination.
+  @doc "See `AI.Messages.list_for_chat/2`"
+  defdelegate list_messages(chat_id, opts \\ []), to: Messages, as: :list_for_chat
 
-  ## Options
-    - limit: Maximum number of messages to return (default: 100)
-    - offset: Number of messages to skip (default: 0)
-  """
-  def list_messages(chat_id, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 100)
-    offset = Keyword.get(opts, :offset, 0)
+  @doc "See `AI.Messages.create_user_message/2`"
+  defdelegate create_user_message(chat, content), to: Messages
 
-    from(m in Message,
-      where: m.chat_id == ^chat_id,
-      order_by: [asc: m.inserted_at],
-      limit: ^limit,
-      offset: ^offset
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Creates a user message and enqueues an AI response job.
-
-  Also records the request for rate limiting purposes.
-  Returns {:error, :chat_is_processing} if the chat is already processing a message.
-
-  Uses optimistic locking and a transaction to prevent race conditions and ensure
-  all operations succeed or fail together.
-
-  ## Examples
-
-      iex> create_user_message(chat, "Hello, how are you?")
-      {:ok, %Message{}}
-
-      iex> create_user_message(chat, "Second message before first completes")
-      {:error, :chat_is_processing}
-
-  """
-  def create_user_message(%Chat{} = chat, content) when is_binary(content) do
-    # Use a transaction to ensure atomicity
-    Repo.transaction(fn ->
-      # Optimistically lock the chat and set is_processing to true atomically
-      # This prevents race conditions where two requests try to process simultaneously
-      {updated_count, _} =
-        from(c in Chat,
-          where: c.id == ^chat.id and c.is_processing == false,
-          select: c
-        )
-        |> Repo.update_all(set: [is_processing: true, updated_at: DateTime.utc_now()])
-
-      case updated_count do
-        0 ->
-          # Chat was already processing or doesn't exist
-          Repo.rollback(:chat_is_processing)
-
-        1 ->
-          # Successfully locked the chat, proceed with message creation
-          message_attrs = %{
-            chat_id: chat.id,
-            role: "user",
-            content: String.trim(content)
-          }
-
-          # Create user message
-          message =
-            case %Message{} |> Message.changeset(message_attrs) |> Repo.insert() do
-              {:ok, msg} -> msg
-              {:error, changeset} -> Repo.rollback(changeset)
-            end
-
-          # Record request for rate limiting
-          case record_request(chat.user_id) do
-            {:ok, _tracking} -> :ok
-            {:error, reason} -> Repo.rollback(reason)
-          end
-
-          # Reload chat to get updated version
-          updated_chat = Repo.get!(Chat, chat.id)
-
-          # Enqueue AI response job
-          case enqueue_ai_response(updated_chat, message) do
-            {:ok, _job} -> message
-            {:error, reason} -> Repo.rollback(reason)
-          end
-      end
-    end)
-    |> case do
-      {:ok, message} -> {:ok, message}
-      {:error, :chat_is_processing} -> {:error, :chat_is_processing}
-      {:error, changeset} -> {:error, changeset}
-    end
-  end
-
-  @doc """
-  Creates an assistant message with cost tracking.
-
-  Called by the AIChatWorker after receiving AI response.
-  Clears the is_processing flag to allow new messages.
-  """
-  def create_assistant_message(
-        %Chat{} = chat,
-        content,
-        tokens_used,
-        cost_usd,
-        api_request_log_id
-      ) do
-    message_attrs = %{
-      chat_id: chat.id,
-      role: "assistant",
-      content: content,
-      tokens_used: tokens_used,
-      cost_usd: cost_usd,
-      api_request_log_id: api_request_log_id
-    }
-
-    with {:ok, message} <- %Message{} |> Message.changeset(message_attrs) |> Repo.insert(),
-         {:ok, _chat} <- update_chat(chat, %{is_processing: false}) do
-      {:ok, message}
-    end
-  end
-
-  defp enqueue_ai_response(%Chat{} = chat, %Message{} = user_message) do
-    %{
-      chat_id: chat.id,
-      user_id: chat.user_id,
-      user_message_id: user_message.id,
-      user_message: user_message.content
-    }
-    |> Playground.Workers.AIChatWorker.new(queue: :ai_chat)
-    |> Oban.insert()
-  end
-
-  @doc """
-  Clears the is_processing flag on a chat.
-
-  Used by the worker to reset state on error or cancellation.
-
-  ## Examples
-
-      iex> clear_processing_flag(chat)
-      {:ok, %Chat{is_processing: false}}
-
-  """
-  def clear_processing_flag(%Chat{} = chat) do
-    update_chat(chat, %{is_processing: false})
-  end
+  @doc "See `AI.Messages.create_assistant_message/5`"
+  defdelegate create_assistant_message(chat, content, tokens_used, cost_usd, api_request_log_id),
+    to: Messages
 
   # ============================================================================
-  # Rate Limiting
+  # Rate Limiting - Delegate to AI.RateLimiting
   # ============================================================================
 
-  @doc """
-  Checks if a user has exceeded their rate limits across multiple time windows.
+  @doc "See `AI.RateLimiting.check_rate_limit/1`"
+  defdelegate check_rate_limit(user_id), to: RateLimiting
 
-  Returns {:ok, stats} if under all limits, {:error, {:rate_limit_exceeded, window}} if over.
+  @doc "See `AI.RateLimiting.record_request/1`"
+  defdelegate record_request(user_id), to: RateLimiting
 
-  Uses a single optimized database query with FILTER clauses for better performance.
+  @doc "See `AI.RateLimiting.cleanup_old_tracking/0`"
+  defdelegate cleanup_old_request_tracking(), to: RateLimiting, as: :cleanup_old_tracking
 
-  ## Examples
-
-      iex> check_rate_limit(user_id)
-      {:ok, %{per_minute: 18, per_hour: 95, per_day: 487}}
-
-      iex> check_rate_limit(user_id)
-      {:error, {:rate_limit_exceeded, :per_minute}}
-  """
-  def check_rate_limit(user_id) do
-    now = DateTime.utc_now()
-    settings = Settings.get_site_settings!()
-
-    # Calculate time windows
-    minute_ago = DateTime.add(now, -60, :second)
-    hour_ago = DateTime.add(now, -1, :hour)
-    day_ago = DateTime.add(now, -24, :hour)
-
-    # Single query with FILTER clauses to count all windows at once
-    counts =
-      from(r in RequestTracking,
-        where: r.user_id == ^user_id,
-        select: %{
-          per_minute:
-            fragment("COUNT(*) FILTER (WHERE requested_at >= ?)", ^minute_ago),
-          per_hour:
-            fragment("COUNT(*) FILTER (WHERE requested_at >= ?)", ^hour_ago),
-          per_day:
-            fragment("COUNT(*) FILTER (WHERE requested_at >= ?)", ^day_ago)
-        }
-      )
-      |> Repo.one()
-
-    # Check each window
-    windows = [
-      {:per_minute, settings.ai_rate_limit_per_minute, counts.per_minute},
-      {:per_hour, settings.ai_rate_limit_per_hour, counts.per_hour},
-      {:per_day, settings.ai_rate_limit_per_day, counts.per_day}
-    ]
-
-    Enum.reduce_while(windows, {:ok, %{}}, fn {window_name, limit, count}, {:ok, stats} ->
-      if count < limit do
-        {:cont, {:ok, Map.put(stats, window_name, limit - count)}}
-      else
-        {:halt, {:error, {:rate_limit_exceeded, window_name}}}
-      end
-    end)
-  end
-
-  @doc """
-  Records a new AI request timestamp for rate limiting.
-
-  Note: Cleanup of old tracking records is handled by a scheduled Oban job
-  to avoid performance impact during request processing.
-  """
-  def record_request(user_id) do
-    now = DateTime.utc_now()
-
-    # Insert new tracking record
-    tracking_attrs = %{
-      user_id: user_id,
-      requested_at: now
-    }
-
-    %RequestTracking{}
-    |> RequestTracking.changeset(tracking_attrs)
-    |> Repo.insert()
-  end
-
-  @doc """
-  Cleans up old request tracking records beyond the retention period (25 hours).
-
-  This should be called by a scheduled Oban job, not synchronously during requests.
-  Returns the number of records deleted.
-  """
-  def cleanup_old_request_tracking do
-    cutoff = DateTime.add(DateTime.utc_now(), -25, :hour)
-
-    {count, _} =
-      from(r in RequestTracking,
-        where: r.requested_at < ^cutoff
-      )
-      |> Repo.delete_all()
-
-    count
-  end
-
-  @doc """
-  Gets current usage stats for a user across all time windows.
-
-  Returns %{
-    per_minute: %{used: integer, limit: integer, remaining: integer},
-    per_hour: %{used: integer, limit: integer, remaining: integer},
-    per_day: %{used: integer, limit: integer, remaining: integer}
-  }
-
-  Uses a single optimized database query with FILTER clauses for better performance.
-  """
-  def get_usage_stats(user_id) do
-    now = DateTime.utc_now()
-    settings = Settings.get_site_settings!()
-
-    # Calculate time windows
-    minute_ago = DateTime.add(now, -60, :second)
-    hour_ago = DateTime.add(now, -1, :hour)
-    day_ago = DateTime.add(now, -24, :hour)
-
-    # Single query with FILTER clauses to count all windows at once
-    counts =
-      from(r in RequestTracking,
-        where: r.user_id == ^user_id,
-        select: %{
-          per_minute:
-            fragment("COUNT(*) FILTER (WHERE requested_at >= ?)", ^minute_ago),
-          per_hour:
-            fragment("COUNT(*) FILTER (WHERE requested_at >= ?)", ^hour_ago),
-          per_day:
-            fragment("COUNT(*) FILTER (WHERE requested_at >= ?)", ^day_ago)
-        }
-      )
-      |> Repo.one()
-
-    # Build stats map
-    %{
-      per_minute: %{
-        used: counts.per_minute,
-        limit: settings.ai_rate_limit_per_minute,
-        remaining: max(0, settings.ai_rate_limit_per_minute - counts.per_minute)
-      },
-      per_hour: %{
-        used: counts.per_hour,
-        limit: settings.ai_rate_limit_per_hour,
-        remaining: max(0, settings.ai_rate_limit_per_hour - counts.per_hour)
-      },
-      per_day: %{
-        used: counts.per_day,
-        limit: settings.ai_rate_limit_per_day,
-        remaining: max(0, settings.ai_rate_limit_per_day - counts.per_day)
-      }
-    }
-  end
+  @doc "See `AI.RateLimiting.get_usage_stats/1`"
+  defdelegate get_usage_stats(user_id), to: RateLimiting
 
   # ============================================================================
-  # Cost Tracking & Analytics
+  # Analytics - Delegate to AI.Analytics
   # ============================================================================
 
-  @doc """
-  Calculates total cost for a user within a date range.
+  @doc "See `AI.Analytics.get_total_cost_by_user/2`"
+  defdelegate get_total_cost_by_user(user_id, date_range \\ nil), to: Analytics
 
-  ## Parameters
-    - user_id: The user ID
-    - date_range: Tuple of {start_date, end_date} or nil for all time
+  @doc "See `AI.Analytics.get_total_cost_by_chat/1`"
+  defdelegate get_total_cost_by_chat(chat_id), to: Analytics
 
-  ## Examples
-
-      iex> get_total_cost_by_user(user_id, {~D[2024-01-01], ~D[2024-01-31]})
-      Decimal.new("12.50")
-
-  """
-  def get_total_cost_by_user(user_id, date_range \\ nil) do
-    query =
-      from m in Message,
-        join: c in Chat,
-        on: m.chat_id == c.id,
-        where: c.user_id == ^user_id and m.role == "assistant" and not is_nil(m.cost_usd),
-        select: sum(m.cost_usd)
-
-    query =
-      case date_range do
-        {start_date, end_date} ->
-          from m in query,
-            where: fragment("?::date", m.inserted_at) >= ^start_date,
-            where: fragment("?::date", m.inserted_at) <= ^end_date
-
-        nil ->
-          query
-      end
-
-    Repo.one(query) || Decimal.new(0)
-  end
-
-  @doc """
-  Calculates total cost for a specific chat.
-  """
-  def get_total_cost_by_chat(chat_id) do
-    from(m in Message,
-      where: m.chat_id == ^chat_id and m.role == "assistant" and not is_nil(m.cost_usd),
-      select: sum(m.cost_usd)
-    )
-    |> Repo.one()
-    |> then(fn sum -> sum || Decimal.new(0) end)
-  end
-
-  @doc """
-  Gets message count and total cost for a chat.
-
-  Uses a single optimized database aggregation query instead of loading
-  all messages into memory.
-  """
-  def get_chat_stats(chat_id) do
-    stats =
-      from(m in Message,
-        where: m.chat_id == ^chat_id,
-        select: %{
-          user_messages:
-            fragment("COUNT(*) FILTER (WHERE role = 'user')"),
-          assistant_messages:
-            fragment("COUNT(*) FILTER (WHERE role = 'assistant')"),
-          total_tokens: sum(m.tokens_used),
-          total_cost: sum(m.cost_usd)
-        }
-      )
-      |> Repo.one()
-
-    %{
-      user_messages: stats.user_messages,
-      assistant_messages: stats.assistant_messages,
-      total_tokens: stats.total_tokens || 0,
-      total_cost: stats.total_cost || Decimal.new(0)
-    }
-  end
+  @doc "See `AI.Analytics.get_chat_stats/1`"
+  defdelegate get_chat_stats(chat_id), to: Analytics
 end
