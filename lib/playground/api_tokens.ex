@@ -170,7 +170,9 @@ defmodule Playground.ApiTokens do
 
   """
   def get_valid_token(connector_organization_id, _service_name) do
-    case get_token("connector_organization", connector_organization_id) do
+    # Tokens are stored with resource_type "connector" (not "connector_organization")
+    # The resource_id is the connector_organization.id
+    case get_token("connector", connector_organization_id) do
       nil ->
         {:error, :not_found}
 

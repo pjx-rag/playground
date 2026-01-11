@@ -368,8 +368,8 @@ defmodule PlaygroundWeb.Components.AdminTable do
     params = if page_size, do: Map.put(params, "page_size", page_size), else: params
 
     # Preserve order if it exists
-    order_by = Map.get(flop, :order_by, [])
-    order_directions = Map.get(flop, :order_directions, [:asc])
+    order_by = Map.get(flop, :order_by) || []
+    order_directions = Map.get(flop, :order_directions) || [:asc]
 
     params =
       if order_by != [] do

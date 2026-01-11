@@ -63,6 +63,7 @@ defmodule PlaygroundWeb.Layouts do
   attr :current_user, :map, default: nil, doc: "the current user"
   attr :site_settings, :map, default: nil, doc: "site-wide settings"
   attr :page_title, :string, default: nil, doc: "the page title"
+  attr :page_title_suffix, :any, default: nil, doc: "extra content to show after the page title"
   attr :breadcrumbs, :list, default: nil, doc: "breadcrumb items"
   attr :inner_content, :any, default: nil, doc: "inner content for live layouts"
   attr :header_content, :any, default: nil, doc: "custom header content to replace breadcrumbs area"
@@ -87,6 +88,7 @@ defmodule PlaygroundWeb.Layouts do
       end)
       |> assign_new(:header_content, fn -> nil end)
       |> assign_new(:hide_header_padding, fn -> false end)
+      |> assign_new(:page_title_suffix, fn -> nil end)
 
     ~H"""
     <%= if @current_user do %>
@@ -158,9 +160,14 @@ defmodule PlaygroundWeb.Layouts do
 
               <.separator vertical class="my-5 md:hidden" />
 
-              <h1 class="text-xl font-semibold text-foreground">
-                {@page_title || "Dashboard"}
-              </h1>
+              <div class="flex items-center gap-3">
+                <h1 class="text-xl font-semibold text-foreground">
+                  {@page_title || "Dashboard"}
+                </h1>
+                <%= if @page_title_suffix do %>
+                  {@page_title_suffix}
+                <% end %>
+              </div>
 
               <div class="ml-auto flex items-center gap-x-4 md:gap-x-6">
                 <.user_menu current_user={@current_user} />
