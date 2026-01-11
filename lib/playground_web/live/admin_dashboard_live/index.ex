@@ -9,7 +9,8 @@ defmodule PlaygroundWeb.AdminDashboardLive.Index do
   # All API services that implement the APIClient behaviour
   @api_services [
     Playground.Services.OpenRouter,
-    Playground.Services.WeatherAPI
+    Playground.Services.WeatherAPI,
+    Playground.Services.GoogleDrive
   ]
 
   @impl true

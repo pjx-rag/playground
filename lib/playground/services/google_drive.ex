@@ -42,8 +42,52 @@ defmodule Playground.Services.GoogleDrive do
 
   @impl Playground.APIClient
   def health_check do
-    # For OAuth services, health_check without token just checks if API is reachable
-    {:ok, %{status: :healthy, latency_ms: 0, message: "OAuth-based service"}}
+    # Check if Google Drive API is reachable without requiring a customer token
+    # Uses the public discovery document endpoint which doesn't require authentication
+    start_time = System.monotonic_time(:millisecond)
+
+    case Req.get("https://www.googleapis.com/discovery/v1/apis/drive/v3/rest") do
+      {:ok, %{status: 200, body: body}} when is_map(body) ->
+        latency_ms = System.monotonic_time(:millisecond) - start_time
+
+        # Verify OAuth configuration is present
+        config_status = check_oauth_config()
+
+        {:ok, %{
+          status: :healthy,
+          latency_ms: latency_ms,
+          message: "Google Drive API is reachable",
+          oauth_configured: config_status
+        }}
+
+      {:ok, %{status: status}} ->
+        {:error, %{
+          status: :degraded,
+          message: "Google API returned unexpected status: #{status}",
+          oauth_configured: check_oauth_config()
+        }}
+
+      {:error, reason} ->
+        {:error, %{
+          status: :unhealthy,
+          message: "Cannot reach Google Drive API: #{inspect(reason)}",
+          oauth_configured: check_oauth_config()
+        }}
+    end
+  end
+
+  defp check_oauth_config do
+    client_id = Application.get_env(:playground, :google_drive)[:client_id]
+    client_secret = Application.get_env(:playground, :google_drive)[:client_secret]
+
+    cond do
+      is_nil(client_id) or client_id == "" ->
+        {:error, "GOOGLE_DRIVE_CLIENT_ID not configured"}
+      is_nil(client_secret) or client_secret == "" ->
+        {:error, "GOOGLE_DRIVE_CLIENT_SECRET not configured"}
+      true ->
+        :ok
+    end
   end
 
   @impl Playground.APIClient
@@ -238,10 +282,11 @@ defmodule Playground.Services.GoogleDrive do
         "https://www.googleapis.com/drive/v3/files/#{file_id}?alt=media"
       end
 
-    case Req.get(build_req(token), url: url, into: :self) do
+    # Don't use streaming for now - download the full content
+    case Req.get(build_req(token), url: url) do
       {:ok, %{status: 200, body: body}} ->
         if stream? do
-          # Return as stream - convert body to enumerable stream
+          # Return as stream - wrap binary content in a stream for compatibility
           {:ok, Stream.map([body], & &1)}
         else
           # Return as binary
@@ -254,7 +299,8 @@ defmodule Playground.Services.GoogleDrive do
       {:ok, %{status: 403}} ->
         {:error, :forbidden}
 
-      {:ok, %{status: status}} ->
+      {:ok, %{status: status, body: body}} ->
+        Logger.error("Google Drive download failed", status: status, file_id: file_id, body: inspect(body))
         {:error, "Download failed with status #{status}"}
 
       {:error, reason} ->

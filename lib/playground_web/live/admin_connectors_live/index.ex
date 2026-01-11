@@ -100,6 +100,40 @@ defmodule PlaygroundWeb.AdminConnectorsLive.Index do
   end
 
   @impl true
+  def handle_event("test_api_health", %{"key" => "google_drive"}, socket) do
+    # Test Google Drive API health WITHOUT using customer tokens
+    case Playground.Services.GoogleDrive.health_check() do
+      {:ok, %{status: :healthy, latency_ms: latency, oauth_configured: oauth_status}} ->
+        config_msg =
+          case oauth_status do
+            :ok -> ""
+            {:error, msg} -> " (Warning: #{msg})"
+          end
+
+        {:noreply,
+         put_flash(
+           socket,
+           :info,
+           "Google Drive API is healthy (#{latency}ms latency)#{config_msg}"
+         )}
+
+      {:error, %{message: message, oauth_configured: oauth_status}} ->
+        config_msg =
+          case oauth_status do
+            :ok -> ""
+            {:error, msg} -> " OAuth: #{msg}."
+          end
+
+        {:noreply, put_flash(socket, :error, "API health check failed: #{message}.#{config_msg}")}
+    end
+  end
+
+  @impl true
+  def handle_event("test_api_health", %{"key" => _other_key}, socket) do
+    {:noreply, put_flash(socket, :info, "Health check not yet implemented for this connector")}
+  end
+
+  @impl true
   def handle_event("disconnect", %{"id" => id}, socket) do
     connector_org = Connectors.get_connector_organization!(id)
 
@@ -278,6 +312,15 @@ defmodule PlaygroundWeb.AdminConnectorsLive.Index do
           <.icon name="hero-folder-open" class="w-4 h-4" />
           Browse
         </.link>
+        <button
+          type="button"
+          phx-click="test_api_health"
+          phx-value-key={@conn_org.connector.key}
+          class="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium text-foreground bg-card border border-base rounded-lg hover:bg-primary/10 transition-colors"
+          title="Test API connectivity"
+        >
+          <.icon name="hero-signal" class="w-4 h-4" />
+        </button>
         <button
           type="button"
           phx-click="disconnect"
