@@ -72,8 +72,15 @@ defmodule Playground.RAG.Workers.ProcessTextFileWorker do
   end
 
   @impl Oban.Worker
-  def perform(%Oban.Job{args: %{"file_id" => file_id}}) do
-    file = Repo.get!(File, file_id) |> Repo.preload(:connector_organization)
+  def perform(%Oban.Job{args: %{"file_id" => file_id, "organization_id" => organization_id}}) do
+    # Multi-tenancy enforcement: Verify file belongs to specified organization
+    file =
+      from(f in File,
+        join: co in assoc(f, :connector_organization),
+        where: f.id == ^file_id and co.organization_id == ^organization_id,
+        preload: [:connector_organization]
+      )
+      |> Repo.one!()
 
     # Guardrail: Only process synced files with supported MIME types
     if file.sync_status != "synced" or not can_process?(file.mime_type) do

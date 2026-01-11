@@ -69,22 +69,28 @@ defmodule Playground.Files do
   end
 
   @doc """
-  Gets a single file.
+  Gets a single file with organization verification.
 
-  Raises `Ecto.NoResultsError` if the File does not exist.
+  Raises `Ecto.NoResultsError` if the File does not exist or user doesn't have access.
 
   ## Examples
 
-      iex> get_file!(123)
+      iex> get_file!(123, user)
       %File{}
 
-      iex> get_file!(456)
+      iex> get_file!(456, user)
       ** (Ecto.NoResultsError)
 
   """
-  def get_file!(id) do
-    Repo.get!(File, id)
-    |> Repo.preload(:connector_organization)
+  def get_file!(id, user) do
+    org = Organizations.get_user_organization(user)
+
+    from(f in File,
+      join: co in assoc(f, :connector_organization),
+      where: f.id == ^id and co.organization_id == ^org.id,
+      preload: [:connector_organization]
+    )
+    |> Repo.one!()
   end
 
   @doc """
@@ -271,9 +277,13 @@ defmodule Playground.Files do
 
   # Private: Enqueue appropriate chunking worker based on MIME type
   defp enqueue_chunking_job(file) do
+    # Preload connector_organization to get organization_id
+    file = Repo.preload(file, :connector_organization)
+    organization_id = file.connector_organization.organization_id
+
     cond do
       file.mime_type in @text_mime_types ->
-        enqueue_worker(Playground.RAG.Workers.ProcessTextFileWorker, file.id)
+        enqueue_worker(Playground.RAG.Workers.ProcessTextFileWorker, file.id, organization_id)
 
       file.mime_type == "application/pdf" ->
         # TODO: Implement ProcessPdfFileWorker
@@ -281,12 +291,12 @@ defmodule Playground.Files do
 
       true ->
         # Default to text worker for unknown types
-        enqueue_worker(Playground.RAG.Workers.ProcessTextFileWorker, file.id)
+        enqueue_worker(Playground.RAG.Workers.ProcessTextFileWorker, file.id, organization_id)
     end
   end
 
-  defp enqueue_worker(worker_module, file_id) do
-    %{file_id: file_id}
+  defp enqueue_worker(worker_module, file_id, organization_id) do
+    %{file_id: file_id, organization_id: organization_id}
     |> worker_module.new()
     |> Oban.insert()
   end

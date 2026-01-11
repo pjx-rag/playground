@@ -36,22 +36,23 @@ defmodule Playground.RAG.Workers.EmbedChunksWorker do
   alias Playground.Services.OpenRouterEmbeddings
 
   @impl Oban.Worker
-  def perform(%Oban.Job{args: %{"chunk_ids" => chunk_ids}}) do
+  def perform(%Oban.Job{args: %{"chunk_ids" => chunk_ids, "organization_id" => organization_id}}) do
     start_ms = System.monotonic_time(:millisecond)
 
-    # Load chunks with their files
+    # Multi-tenancy enforcement: Load chunks with organization verification
     chunks =
       from(c in Chunk,
         join: f in File,
         on: c.file_id == f.id,
-        where: c.id in ^chunk_ids,
+        join: co in assoc(f, :connector_organization),
+        where: c.id in ^chunk_ids and co.organization_id == ^organization_id,
         preload: [file: f],
         order_by: [asc: c.position]
       )
       |> Repo.all()
 
     if Enum.empty?(chunks) do
-      Logger.info("No chunks found for batch", chunk_ids: chunk_ids)
+      Logger.info("No chunks found for batch", chunk_ids: chunk_ids, organization_id: organization_id)
       :ok
     else
       process_chunk_batch(chunks, start_ms)
@@ -206,25 +207,36 @@ defmodule Playground.RAG.Workers.EmbedChunksWorker do
   end
 
   defp complete_files_to_ready(chunks_by_file, start_ms) do
-    # For each file, check if all chunks now have embeddings
-    Enum.each(chunks_by_file, fn {file_id, _file_chunks} ->
-      # Count total chunks and embedded chunks for this file
-      file = Repo.get!(File, file_id)
+    file_ids = Map.keys(chunks_by_file)
 
-      total_chunks =
-        from(c in Chunk,
-          where: c.file_id == ^file_id and c.revision == ^file.processing_revision,
-          select: count(c.id)
-        )
-        |> Repo.one()
+    # Single query for all completion stats (fixes N+1 query)
+    chunk_stats =
+      from(c in Chunk,
+        join: f in File,
+        on: c.file_id == f.id,
+        where: c.file_id in ^file_ids and c.revision == f.processing_revision,
+        group_by: [c.file_id, f.processing_revision],
+        select: {
+          c.file_id,
+          f.processing_revision,
+          count(c.id),
+          sum(fragment("CASE WHEN ? IS NOT NULL THEN 1 ELSE 0 END", c.embedding))
+        }
+      )
+      |> Repo.all()
+      |> Map.new(fn {file_id, revision, total, embedded} -> {file_id, {revision, total, embedded}} end)
 
-      embedded_chunks =
-        from(c in Chunk,
-          where: c.file_id == ^file_id and c.revision == ^file.processing_revision,
-          where: not is_nil(c.embedding),
-          select: count(c.id)
-        )
-        |> Repo.one()
+    # Batch query all files
+    files =
+      from(f in File,
+        where: f.id in ^file_ids
+      )
+      |> Repo.all()
+      |> Map.new(fn file -> {file.id, file} end)
+
+    # Transition completed files to ready
+    Enum.each(chunk_stats, fn {file_id, {revision, total_chunks, embedded_chunks}} ->
+      file = Map.get(files, file_id)
 
       if total_chunks == embedded_chunks do
         # All chunks embedded - transition to ready
@@ -235,7 +247,7 @@ defmodule Playground.RAG.Workers.EmbedChunksWorker do
           "embedding_complete",
           "embedding",
           "ready",
-          revision: file.processing_revision,
+          revision: revision,
           duration_ms: duration,
           metadata: %{chunk_count: total_chunks}
         )

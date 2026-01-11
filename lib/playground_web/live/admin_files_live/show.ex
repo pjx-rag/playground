@@ -8,8 +8,7 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
   import PlaygroundWeb.Components.AdminTable
   import PlaygroundWeb.Components.PipelineSteps
 
-  alias Playground.Repo
-  alias Playground.Files.File
+  alias Playground.Files
   alias Playground.Files.PubSub
   alias Playground.RAG.Chunk
   alias Playground.RAG.EventLog
@@ -21,7 +20,7 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
       PubSub.subscribe_to_file(id)
     end
 
-    file = load_file(id)
+    file = load_file(id, socket.assigns.current_user)
 
     {:ok,
      socket
@@ -54,9 +53,9 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
     {:noreply, socket}
   end
 
-  defp load_file(file_id) do
-    Repo.get!(File, file_id)
-    |> Repo.preload(connector_organization: :connector)
+  defp load_file(file_id, user) do
+    # Multi-tenancy enforcement: Load file with organization verification
+    Files.get_file!(file_id, user)
   end
 
   defp title_suffix(file) do
@@ -150,7 +149,7 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
   @impl true
   def handle_info({event_type, updated_file}, socket) when event_type in @file_events do
     # Reload file data, events, and chunks when file status changes
-    file = load_file(updated_file.id)
+    file = load_file(updated_file.id, socket.assigns.current_user)
 
     {:noreply,
      socket
@@ -164,11 +163,14 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
     file = socket.assigns.file
 
     if can_trigger_next_step?(file) do
-      # Enqueue the processing worker - the worker will transition states and broadcast updates
-      Playground.RAG.Workers.ProcessTextFileWorker.new(%{file_id: file.id})
-      |> Oban.insert()
+      # Enqueue the processing worker with organization verification via Files context
+      case Files.sync_and_process_files([file.id]) do
+        {:ok, _count} ->
+          {:noreply, put_flash(socket, :info, "Processing queued for #{file.name}")}
 
-      {:noreply, put_flash(socket, :info, "Processing queued for #{file.name}")}
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Failed to queue processing: #{inspect(reason)}")}
+      end
     else
       {:noreply, put_flash(socket, :error, "Cannot start processing for this file")}
     end
@@ -178,10 +180,10 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
   def handle_event("reset_file", _params, socket) do
     file = socket.assigns.file
 
-    case Playground.Files.reset_file_for_reprocessing(file) do
+    case Files.reset_file_for_reprocessing(file) do
       {:ok, _updated_file} ->
-        # Reload file with proper preloads
-        reloaded_file = load_file(file.id)
+        # Reload file with organization verification
+        reloaded_file = load_file(file.id, socket.assigns.current_user)
 
         {:noreply,
          socket

@@ -27,60 +27,6 @@ defmodule Playground.ApiTokens do
   end
 
   @doc """
-  Gets a token for a specific resource.
-
-  Raises `Ecto.NoResultsError` if the ApiToken does not exist.
-
-  ## Examples
-
-      iex> get_token!("connector", 123)
-      %ApiToken{}
-
-      iex> get_token!("connector", 456)
-      ** (Ecto.NoResultsError)
-
-  """
-  def get_token!(resource_type, resource_id) do
-    Repo.get_by!(ApiToken, resource_type: resource_type, resource_id: resource_id)
-  end
-
-  @doc """
-  Creates an api token.
-
-  ## Examples
-
-      iex> create_token(%{resource_type: "connector", resource_id: 1, access_token: "token"})
-      {:ok, %ApiToken{}}
-
-      iex> create_token(%{field: bad_value})
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def create_token(attrs \\ %{}) do
-    %ApiToken{}
-    |> ApiToken.changeset(attrs)
-    |> Repo.insert()
-  end
-
-  @doc """
-  Updates an api token.
-
-  ## Examples
-
-      iex> update_token(api_token, %{access_token: "new_token"})
-      {:ok, %ApiToken{}}
-
-      iex> update_token(api_token, %{field: bad_value})
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def update_token(%ApiToken{} = api_token, attrs) do
-    api_token
-    |> ApiToken.changeset(attrs)
-    |> Repo.update()
-  end
-
-  @doc """
   Refreshes a token with new OAuth credentials.
 
   ## Examples

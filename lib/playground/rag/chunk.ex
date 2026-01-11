@@ -57,5 +57,23 @@ defmodule Playground.RAG.Chunk do
     ])
     |> validate_required([:file_id, :content, :revision, :position, :chunk_hash])
     |> foreign_key_constraint(:file_id)
+    |> validate_embedding_dimensions()
+  end
+
+  defp validate_embedding_dimensions(changeset) do
+    case get_change(changeset, :embedding) do
+      nil ->
+        changeset
+
+      embedding when is_list(embedding) ->
+        if length(embedding) == 1536 do
+          changeset
+        else
+          add_error(changeset, :embedding, "must have exactly 1536 dimensions, got #{length(embedding)}")
+        end
+
+      _ ->
+        changeset
+    end
   end
 end

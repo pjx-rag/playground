@@ -38,7 +38,9 @@ config :playground, Oban,
     # Refresh OAuth tokens every 5 minutes (proactive refresh before expiry)
     {"*/5 * * * *", Playground.ApiTokens.Workers.TokenRefreshWorker, args: %{}},
     # Poll for chunked files ready for embedding every minute
-    {"* * * * *", Playground.RAG.Workers.EmbedChunksPoller, args: %{}}
+    {"* * * * *", Playground.RAG.Workers.EmbedChunksPoller, args: %{}},
+    # Clean up expired OAuth states every hour
+    {"0 * * * *", Playground.OAuth.CleanupExpiredStatesWorker, args: %{}}
   ]
 
 config :playground,

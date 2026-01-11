@@ -13,7 +13,7 @@ defmodule PlaygroundWeb.AuthController do
   Handles the OAuth authorization code exchange and token storage.
   """
   def google_drive_callback(conn, %{"code" => code, "state" => state} = _params) do
-    with {:ok, user_id, connector_id} <- verify_state(state),
+    with {:ok, user_id, connector_id} <- Playground.OAuth.verify_and_consume_state(state),
          user <- Playground.Accounts.get_user!(user_id),
          connector <- Connectors.get_connector!(connector_id),
          org <- Organizations.get_user_organization(user),
@@ -30,7 +30,7 @@ defmodule PlaygroundWeb.AuthController do
         Logger.warning("Invalid OAuth state parameter received")
 
         conn
-        |> put_flash(:error, "Invalid authorization request. Please try again.")
+        |> put_flash(:error, "Invalid or expired authorization request. Please try again.")
         |> redirect(to: ~p"/admin/connectors")
 
       {:error, reason} ->
@@ -59,28 +59,6 @@ defmodule PlaygroundWeb.AuthController do
   end
 
   ## Private Functions
-
-  defp verify_state(state) do
-    case String.split(state, ":", parts: 3) do
-      [user_id_str, connector_id_str, signature] ->
-        data = "#{user_id_str}:#{connector_id_str}"
-        expected_signature = :crypto.mac(:hmac, :sha256, state_secret(), data) |> Base.encode64()
-
-        if signature == expected_signature do
-          {:ok, String.to_integer(user_id_str), String.to_integer(connector_id_str)}
-        else
-          {:error, :invalid_state}
-        end
-
-      _ ->
-        {:error, :invalid_state}
-    end
-  end
-
-  defp state_secret do
-    Application.fetch_env!(:playground, PlaygroundWeb.Endpoint)[:secret_key_base]
-    |> binary_part(0, 32)
-  end
 
   defp create_or_update_connector_org(org, connector, user) do
     case Connectors.get_organization_connector_by_key(user, connector.key) do

@@ -61,8 +61,14 @@ defmodule PlaygroundWeb.AdminConnectorsLive.Index do
     auth_url =
       case connector.key do
         "google_drive" ->
-          state = generate_state(socket.assigns.current_user.id, connector.id)
-          Playground.Services.GoogleDrive.authorize_url(state: state)
+          # Create secure, database-backed OAuth state
+          case Playground.OAuth.create_state(socket.assigns.current_user.id, connector.id) do
+            {:ok, state_id} ->
+              Playground.Services.GoogleDrive.authorize_url(state: state_id)
+
+            {:error, _} ->
+              nil
+          end
 
         _ ->
           nil
@@ -152,17 +158,6 @@ defmodule PlaygroundWeb.AdminConnectorsLive.Index do
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to disconnect connector")}
     end
-  end
-
-  defp generate_state(user_id, connector_id) do
-    data = "#{user_id}:#{connector_id}"
-    signature = :crypto.mac(:hmac, :sha256, state_secret(), data) |> Base.encode64()
-    "#{data}:#{signature}"
-  end
-
-  defp state_secret do
-    Application.fetch_env!(:playground, PlaygroundWeb.Endpoint)[:secret_key_base]
-    |> binary_part(0, 32)
   end
 
   defp status_badge_class(status) do
