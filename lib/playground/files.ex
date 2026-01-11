@@ -292,6 +292,66 @@ defmodule Playground.Files do
   end
 
   @doc """
+  Resets a file for reprocessing by incrementing its revision and clearing chunks.
+
+  This allows a file to be reprocessed from scratch:
+  1. Transitions file to "draft" status (via Machinery)
+  2. Increments processing_revision
+  3. Deletes all chunks from the old revision
+
+  ## Examples
+
+      iex> reset_file_for_reprocessing(file)
+      {:ok, %File{}}
+
+      iex> reset_file_for_reprocessing(invalid_file)
+      {:error, reason}
+
+  """
+  def reset_file_for_reprocessing(%File{} = file) do
+    alias Playground.RAG.Chunk
+
+    Repo.transaction(fn ->
+      # Check if file has chunks (meaning we need to increment revision)
+      has_chunks = Repo.exists?(from(c in Chunk, where: c.file_id == ^file.id))
+
+      # Build the base changes - always reset to draft and clear claim state
+      base_changes = %{
+        processing_status: "draft",
+        processing_claim_id: nil,
+        processing_claimed_at: nil,
+        processing_attempt: 0
+      }
+
+      # Add revision increment if there were chunks
+      changes =
+        if has_chunks do
+          new_revision = (file.processing_revision || 1) + 1
+          Map.put(base_changes, :processing_revision, new_revision)
+        else
+          base_changes
+        end
+
+      # Update file directly (bypass Machinery to avoid GenServer issues)
+      updated_file =
+        file
+        |> Ecto.Changeset.change(changes)
+        |> Repo.update!()
+
+      # Delete old chunks if any existed
+      if has_chunks do
+        from(c in Chunk, where: c.file_id == ^file.id)
+        |> Repo.delete_all()
+      end
+
+      # Broadcast the reset event for real-time UI updates
+      Playground.Files.PubSub.broadcast_file_updated(updated_file, :file_reset)
+
+      updated_file
+    end)
+  end
+
+  @doc """
   Gets the count of files by sync status for a connector organization.
 
   ## Examples

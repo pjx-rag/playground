@@ -9,10 +9,16 @@ defmodule PlaygroundWeb.AdminFilesLive.Index do
 
   alias Playground.Repo
   alias Playground.Files.File
+  alias Playground.Files.PubSub
   alias Playground.Organizations
 
   @impl true
   def mount(_params, _session, socket) do
+    # Subscribe to file updates for real-time UI updates
+    if connected?(socket) do
+      PubSub.subscribe_to_files_index()
+    end
+
     breadcrumbs = [
       %{label: "Admin", path: ~p"/admin"},
       %{label: "Files", path: nil}
@@ -241,6 +247,14 @@ defmodule PlaygroundWeb.AdminFilesLive.Index do
     end
   end
 
+  # PubSub message handlers for real-time updates
+  @impl true
+  def handle_info({event_type, _file}, socket) when event_type in [:file_updated, :file_processing_started, :file_chunked, :file_failed] do
+    # Reload the current page to show updated file status
+    # This ensures the file appears with updated processing_status and chunks_count
+    {:noreply, load_results(socket, Map.get(socket.assigns.meta, :params, %{}))}
+  end
+
   # Helper functions
   defp update_if_changed(existing, new_params, key) do
     case Map.get(new_params, key) do
@@ -403,7 +417,9 @@ defmodule PlaygroundWeb.AdminFilesLive.Index do
         <:col :let={file} label="File" field={:name} sortable td_class="max-w-md">
           <div class="flex items-center gap-3">
             <.file_icon mime_type={file.mime_type} />
-            <span class="truncate"><%= file.name %></span>
+            <.link navigate={~p"/admin/files/#{file.id}"} class="truncate hover:text-primary">
+              <%= file.name %>
+            </.link>
           </div>
         </:col>
 
@@ -442,27 +458,37 @@ defmodule PlaygroundWeb.AdminFilesLive.Index do
         </:col>
 
         <:row_action :let={file}>
-          <%= if file.sync_status == "synced" do %>
-            <button
-              type="button"
-              phx-click="chunk_file"
-              phx-value-id={file.id}
-              class="text-muted-foreground hover:text-foreground"
-              title="Chunk this file"
-            >
-              <.icon name="hero-squares-2x2" class="size-4" />
-            </button>
-          <% end %>
-          <%= if file.metadata["webViewLink"] do %>
-            <a
-              href={file.metadata["webViewLink"]}
-              target="_blank"
-              class="text-muted-foreground hover:text-foreground"
-              title="Open in source"
-            >
-              <.icon name="hero-arrow-top-right-on-square" class="size-4" />
-            </a>
-          <% end %>
+          <.dropdown placement="bottom-end" class="min-w-[150px]">
+            <:toggle>
+              <button
+                type="button"
+                class="text-muted-foreground hover:text-foreground"
+                title="File actions"
+              >
+                <.icon name="hero-ellipsis-horizontal" class="size-4" />
+              </button>
+            </:toggle>
+
+            <.dropdown_link navigate={~p"/admin/files/#{file.id}"}>
+              <.icon name="hero-eye" class="size-4 mr-2" />
+              View File
+            </.dropdown_link>
+
+            <%= if file.sync_status == "synced" do %>
+              <.dropdown_button phx-click="chunk_file" phx-value-id={file.id}>
+                <.icon name="hero-squares-2x2" class="size-4 mr-2" />
+                Chunk File
+              </.dropdown_button>
+            <% end %>
+
+            <%= if file.metadata["webViewLink"] do %>
+              <.dropdown_separator />
+              <.dropdown_link href={file.metadata["webViewLink"]} target="_blank">
+                <.icon name="hero-arrow-top-right-on-square" class="size-4 mr-2" />
+                Open in Source
+              </.dropdown_link>
+            <% end %>
+          </.dropdown>
         </:row_action>
       </.admin_table>
 

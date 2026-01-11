@@ -90,6 +90,7 @@ defmodule PlaygroundWeb.Router do
       live "/admin/connectors", AdminConnectorsLive.Index, :index
       live "/admin/connectors/:id", AdminConnectorsLive.Show, :show
       live "/admin/files", AdminFilesLive.Index, :index
+      live "/admin/files/:id", AdminFilesLive.Show, :show
     end
 
     # User management - requires admin:users
