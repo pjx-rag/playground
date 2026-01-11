@@ -8,6 +8,14 @@ defmodule Playground.RAG.EventLog do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @derive {
+    Flop.Schema,
+    filterable: [:file_id, :event, :success, :revision],
+    sortable: [:inserted_at, :event, :duration_ms],
+    default_limit: 25,
+    default_order: %{order_by: [:inserted_at], order_directions: [:desc]}
+  }
+
   schema "event_logs" do
     belongs_to :file, Playground.Files.File
 
