@@ -21,7 +21,8 @@ config :playground, Oban,
     process_text_file: 20,
     process_pdf_file: 3,
     process_office_file: 5,
-    embed_poller: 1
+    embed_poller: 1,
+    embed_chunks: 5
   ],
   repo: Playground.Repo,
   plugins: [
@@ -35,14 +36,18 @@ config :playground, Oban,
     # Clean up old API request logs daily at 4:00 AM UTC
     {"0 4 * * *", Playground.Workers.APIRequestLogCleanupWorker, args: %{}},
     # Refresh OAuth tokens every 5 minutes (proactive refresh before expiry)
-    {"*/5 * * * *", Playground.ApiTokens.Workers.TokenRefreshWorker, args: %{}}
-    # TODO: Add embedding poller cron job once EmbedChunksPollerWorker is implemented
-    # {"*/10 * * * *", Playground.RAG.Workers.EmbedChunksPollerWorker, args: %{}}
+    {"*/5 * * * *", Playground.ApiTokens.Workers.TokenRefreshWorker, args: %{}},
+    # Poll for chunked files ready for embedding every minute
+    {"* * * * *", Playground.RAG.Workers.EmbedChunksPoller, args: %{}}
   ]
 
 config :playground,
   ecto_repos: [Playground.Repo],
   generators: [timestamp_type: :utc_datetime]
+
+# Configure Repo with pgvector types
+config :playground, Playground.Repo,
+  types: Playground.PostgrexTypes
 
 # Configures the endpoint
 config :playground, PlaygroundWeb.Endpoint,
