@@ -110,7 +110,9 @@ defmodule Playground.Settings do
       {"ai_max_tokens", "4096"},
       {"ai_top_p", "1.0"},
       {"ai_frequency_penalty", "0.0"},
-      {"ai_presence_penalty", "0.0"}
+      {"ai_presence_penalty", "0.0"},
+      {"embedding_model", "text-embedding-3-large"},
+      {"embedding_dimensions", "3072"}
     ]
   end
 
