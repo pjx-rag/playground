@@ -39,6 +39,8 @@ defmodule Playground.APIRequestLog do
     field :tokens_completion, :integer
     field :tokens_total, :integer
 
+    belongs_to :event_log, Playground.RAG.EventLog
+
     timestamps(type: :utc_datetime)
   end
 
@@ -57,7 +59,8 @@ defmodule Playground.APIRequestLog do
     :cost_usd,
     :tokens_prompt,
     :tokens_completion,
-    :tokens_total
+    :tokens_total,
+    :event_log_id
   ]
 
   def changeset(log, attrs) do

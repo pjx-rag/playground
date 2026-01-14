@@ -11,13 +11,14 @@ defmodule Playground.RAG.EventLog do
   @derive {
     Flop.Schema,
     filterable: [:file_id, :event, :success, :revision],
-    sortable: [:inserted_at, :event, :duration_ms],
+    sortable: [:inserted_at, :event, :duration_ms, :id],
     default_limit: 25,
-    default_order: %{order_by: [:inserted_at], order_directions: [:desc]}
+    default_order: %{order_by: [:inserted_at, :id], order_directions: [:desc, :desc]}
   }
 
   schema "event_logs" do
     belongs_to :file, Playground.Files.File
+    has_one :api_request_log, Playground.APIRequestLog
 
     field :event, :string
     field :from_status, :string

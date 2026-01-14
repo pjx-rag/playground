@@ -13,13 +13,13 @@ defmodule Playground.RAG.EventLogger do
   @doc """
   Logs a claim event when processing starts.
   """
-  def log_claim(file_id, claim_id, revision) do
+  def log_claim(file_id, claim_id, revision, from_status, to_status) do
     %EventLog{}
     |> EventLog.changeset(%{
       file_id: file_id,
       event: "claim_processing",
-      from_status: "draft",
-      to_status: "processing",
+      from_status: from_status,
+      to_status: to_status,
       success: true,
       claim_id: claim_id,
       revision: revision

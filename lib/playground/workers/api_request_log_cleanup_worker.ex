@@ -31,8 +31,13 @@ defmodule Playground.Workers.APIRequestLogCleanupWorker do
 
     cutoff = DateTime.add(DateTime.utc_now(), -retention_days, :day)
 
+    # Only delete logs that are not linked to events (event_log_id is nil)
+    # Logs linked to events are preserved for debugging expensive AI operations
     {deleted, _} =
-      from(l in APIRequestLog, where: l.inserted_at < ^cutoff)
+      from(l in APIRequestLog,
+        where: l.inserted_at < ^cutoff,
+        where: is_nil(l.event_log_id)
+      )
       |> Repo.delete_all()
 
     {:ok, deleted}
