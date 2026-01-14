@@ -242,6 +242,21 @@ defmodule PlaygroundWeb.AdminConnectorsLive.Show do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("reconnect", _, socket) do
+    connector_org = socket.assigns.connector_org
+
+    # Generate OAuth URL for reconnection
+    case Playground.OAuth.create_state(socket.assigns.current_user.id, connector_org.connector_id) do
+      {:ok, state_id} ->
+        auth_url = GoogleDrive.authorize_url(state: state_id)
+        {:noreply, redirect(socket, external: auth_url)}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to start reconnection. Please try again.")}
+    end
+  end
+
   # Private Functions
 
   defp load_root_files(socket) do
@@ -540,12 +555,22 @@ defmodule PlaygroundWeb.AdminConnectorsLive.Show do
 
         <!-- Error State -->
         <%= if @error do %>
-          <div class="bg-danger/10 border border-danger/20 rounded-xl p-4 flex items-start gap-3">
-            <.icon name="hero-exclamation-triangle" class="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
-            <div>
+          <div class="bg-danger/10 border border-danger/20 rounded-xl p-4 flex items-center gap-3">
+            <.icon name="hero-exclamation-triangle" class="w-5 h-5 text-danger flex-shrink-0" />
+            <div class="flex-1">
               <p class="text-sm font-medium text-danger">Connection Error</p>
               <p class="text-sm text-danger/80 mt-1"><%= @error %></p>
             </div>
+            <.button
+              type="button"
+              phx-click="reconnect"
+              variant="solid"
+              color="danger"
+              size="sm"
+            >
+              <.icon name="hero-arrow-path" class="w-4 h-4" />
+              Reconnect
+            </.button>
           </div>
         <% end %>
 

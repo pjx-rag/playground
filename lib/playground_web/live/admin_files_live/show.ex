@@ -41,14 +41,26 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
 
   @impl true
   def handle_params(params, _url, socket) do
-    # Only apply URL params to the active tab's table
-    # This prevents one tab's pagination/sorting from affecting another
+    # Get active tab from URL params (default to "details")
+    active_tab = Map.get(params, "tab", "details")
+
+    # Validate tab is one of the allowed values
+    active_tab =
+      if active_tab in ["details", "history", "chunks"],
+        do: active_tab,
+        else: "details"
+
+    # Update active tab and load appropriate data
     socket =
-      case socket.assigns.active_tab do
-        "history" -> load_events(socket, params)
-        "chunks" -> load_chunks(socket, params)
-        _ -> socket
-      end
+      socket
+      |> assign(:active_tab, active_tab)
+      |> then(fn s ->
+        case active_tab do
+          "history" -> load_events(s, params)
+          "chunks" -> load_chunks(s, params)
+          _ -> s
+        end
+      end)
 
     {:noreply, socket}
   end
@@ -90,7 +102,11 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
   defp load_events(socket, params) do
     file_id = socket.assigns.file.id
 
-    query = from(e in EventLog, where: e.file_id == ^file_id)
+    query =
+      from(e in EventLog,
+        where: e.file_id == ^file_id,
+        preload: [:api_request_log]
+      )
 
     case Flop.validate_and_run(query, params, for: EventLog) do
       {:ok, {events, meta}} ->
@@ -141,6 +157,9 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
     :file_ready,
     :file_failed,
     :file_reset,
+    # PDF-specific events
+    :file_awaiting_analysis,
+    :file_analyzing,
     # Legacy events for backwards compatibility
     :file_updated,
     :file_processing_started
@@ -198,21 +217,56 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
   end
 
   @impl true
-  def handle_event("switch_tab", %{"tab" => tab}, socket) do
-    # Reset URL params and reload data when switching tabs
-    socket =
-      socket
-      |> assign(:active_tab, tab)
-      |> then(fn s ->
-        case tab do
-          "history" -> load_events(s, %{})
-          "chunks" -> load_chunks(s, %{})
-          _ -> s
-        end
-      end)
-      |> push_patch(to: ~p"/admin/files/#{socket.assigns.file.id}")
+  def handle_event("run_analysis_job", _, socket) do
+    # Manually trigger PDF analysis job
+    alias Playground.RAG.Workers.PdfBatchAnalyzer
 
-    {:noreply, socket}
+    case Oban.insert(PdfBatchAnalyzer.new(%{})) do
+      {:ok, _job} ->
+        {:noreply, put_flash(socket, :info, "PDF analysis job triggered")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to trigger job: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("run_embedding_job", _, socket) do
+    # Manually trigger embedding job for this file's chunks
+    alias Playground.RAG.Workers.EmbedChunksWorker
+
+    file = socket.assigns.file
+
+    # Get chunk IDs for this file
+    chunk_ids =
+      Playground.Repo.all(
+        from(c in Playground.RAG.Chunk,
+          where: c.file_id == ^file.id and is_nil(c.embedding),
+          select: c.id
+        )
+      )
+
+    if Enum.empty?(chunk_ids) do
+      {:noreply, put_flash(socket, :warning, "No chunks without embeddings found")}
+    else
+      # Get organization_id from file's connector_organization
+      organization_id = file.connector_organization.organization_id
+
+      case Oban.insert(EmbedChunksWorker.new(%{chunk_ids: chunk_ids, organization_id: organization_id})) do
+        {:ok, _job} ->
+          {:noreply, put_flash(socket, :info, "Embedding job triggered for #{length(chunk_ids)} chunks")}
+
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Failed to trigger job: #{inspect(reason)}")}
+      end
+    end
+  end
+
+  @impl true
+  def handle_event("switch_tab", %{"tab" => tab}, socket) do
+    # Navigate to the new tab URL - handle_params will update the state
+    path = build_file_path(socket.assigns.file.id, tab)
+    {:noreply, push_patch(socket, to: path)}
   end
 
   @impl true
@@ -262,10 +316,23 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
                   <span class="sm:hidden">Start</span>
                 </.button>
               <% end %>
+              <!-- Admin buttons to run jobs immediately -->
+              <%= if can_run_analysis_job?(@file) do %>
+                <.button phx-click="run_analysis_job" variant="outline" size="sm" title="Run PDF analysis job now (admin)">
+                  <.icon name="hero-bolt" class="w-4 h-4 sm:mr-1.5" />
+                  <span class="hidden sm:inline">Run Analysis</span>
+                </.button>
+              <% end %>
+              <%= if can_run_embedding_job?(@file) do %>
+                <.button phx-click="run_embedding_job" variant="outline" size="sm" title="Run embedding job now (admin)">
+                  <.icon name="hero-bolt" class="w-4 h-4 sm:mr-1.5" />
+                  <span class="hidden sm:inline">Run Embedding</span>
+                </.button>
+              <% end %>
             </div>
           </div>
           <.progress_bar
-            steps={pipeline_step_labels()}
+            steps={pipeline_step_labels(@file)}
             current_step={current_pipeline_step(@file)}
             status_text={pipeline_status_text(@file)}
             status={pipeline_status(@file)}
@@ -276,7 +343,7 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
         <div class={["flex flex-col", if(@active_tab in ["chunks", "history"], do: "flex-1 min-h-0")]}>
           <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
             <.tabs>
-              <.tabs_list variant="segmented" class="min-w-max">
+              <.tabs_list variant="segmented" class="min-w-max" active_tab={@active_tab}>
                 <:tab name="details" phx-click="switch_tab" phx-value-tab="details">
                   <.icon name="hero-document-text" class="w-4 h-4 sm:mr-1.5" />
                   <span class="hidden sm:inline">Details</span>
@@ -403,7 +470,7 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
                     id="events-table"
                     rows={@events}
                     meta={@events_meta}
-                    path={~p"/admin/files/#{@file.id}"}
+                    path={~p"/admin/files/#{@file.id}?tab=history"}
                     show_checkboxes={false}
                   >
                     <:col :let={event} label="Event">
@@ -434,6 +501,20 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
                         >
                           View
                         </button>
+                      <% else %>
+                        <span class="text-muted-foreground">-</span>
+                      <% end %>
+                    </:col>
+
+                    <:col :let={event} label="API Call" class="w-24 hidden lg:table-cell" td_class="hidden lg:table-cell">
+                      <%= if event.api_request_log do %>
+                        <a
+                          href={~p"/admin/api-logs/#{event.api_request_log.id}"}
+                          class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                        >
+                          <.icon name="hero-globe-alt" class="w-3 h-3" />
+                          View
+                        </a>
                       <% else %>
                         <span class="text-muted-foreground">-</span>
                       <% end %>
@@ -473,7 +554,7 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
                     id="chunks-table"
                     rows={@chunks}
                     meta={@meta}
-                    path={~p"/admin/files/#{@file.id}"}
+                    path={~p"/admin/files/#{@file.id}?tab=chunks"}
                     show_checkboxes={false}
                   >
                     <:col :let={chunk} label="#" class="w-16">
@@ -676,6 +757,17 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
   end
 
   # Helper functions
+
+  # Build file path with optional tab parameter
+  defp build_file_path(file_id, tab, extra_params \\ %{})
+  defp build_file_path(file_id, "details", extra_params) when extra_params == %{} do
+    ~p"/admin/files/#{file_id}"
+  end
+  defp build_file_path(file_id, tab, extra_params) do
+    params = Map.put(extra_params, "tab", tab)
+    ~p"/admin/files/#{file_id}?#{params}"
+  end
+
   defp format_bytes(bytes) when is_integer(bytes) do
     cond do
       bytes >= 1_073_741_824 -> "#{Float.round(bytes / 1_073_741_824, 2)} GB"
@@ -764,16 +856,25 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
 
   # Pipeline progress bar helpers
   # Processing statuses managed by Machinery state machine:
-  # draft -> downloading -> chunking -> chunked -> embedding -> ready
+  # Standard flow: draft -> downloading -> chunking -> chunked -> embedding -> ready
+  # PDF flow: draft -> awaiting_analysis -> analyzing -> chunked -> embedding -> ready
   @statuses_order ~w(draft downloading chunking chunked embedding ready)
+  @pdf_statuses_order ~w(draft awaiting_analysis analyzing chunked embedding ready)
 
-  defp pipeline_step_labels do
-    ["Draft", "Downloading", "Chunking", "Chunked", "Embedding", "Ready"]
+  defp pipeline_step_labels(file) do
+    if is_pdf?(file) do
+      ["Draft", "Queued for Analysis", "Analyzing using AI and Chunking", "Queued for Embedding", "Embedding", "Ready"]
+    else
+      ["Draft", "Downloading", "Chunking", "Queued for Embedding", "Embedding", "Ready"]
+    end
   end
 
   defp current_pipeline_step(file) do
-    Enum.find_index(@statuses_order, &(&1 == file.processing_status)) || 0
+    statuses = if is_pdf?(file), do: @pdf_statuses_order, else: @statuses_order
+    Enum.find_index(statuses, &(&1 == file.processing_status)) || 0
   end
+
+  defp is_pdf?(file), do: file.mime_type == "application/pdf"
 
   defp pipeline_status(file) do
     case file.processing_status do
@@ -793,6 +894,16 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
     file.processing_status != "draft"
   end
 
+  # Admin button: Can run analysis job if PDF is awaiting analysis
+  defp can_run_analysis_job?(file) do
+    is_pdf?(file) and file.processing_status == "awaiting_analysis"
+  end
+
+  # Admin button: Can run embedding job if file is chunked (waiting for embeddings)
+  defp can_run_embedding_job?(file) do
+    file.processing_status == "chunked"
+  end
+
   # Get the action button text based on current status
   defp next_step_action_text(file) do
     case file.processing_status do
@@ -810,6 +921,9 @@ defmodule PlaygroundWeb.AdminFilesLive.Show do
       "embedding" -> "Generating embeddings..."
       "ready" -> "Processing complete"
       "failed" -> "Processing failed"
+      # PDF-specific statuses
+      "awaiting_analysis" -> "Queued for analysis..."
+      "analyzing" -> "Extracting text from PDF..."
 
       "draft" ->
         if file.sync_status != "synced" do
