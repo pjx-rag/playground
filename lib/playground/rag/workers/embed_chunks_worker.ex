@@ -130,7 +130,8 @@ defmodule Playground.RAG.Workers.EmbedChunksWorker do
               claim_id: claim_id
             )
 
-            EventLogger.log_claim(file.id, claim_id, file.processing_revision)
+            # Log claim event (chunked → embedding)
+            EventLogger.log_claim(file.id, claim_id, file.processing_revision, "chunked", "embedding")
             {:cont, {:ok, [updated_file | acc]}}
 
           {:error, reason} ->

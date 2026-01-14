@@ -43,14 +43,16 @@ defmodule Playground.Files.File do
   @sync_statuses ~w(unsynced synced deleted)
 
   # State machine configuration
-  @processing_states ~w(draft downloading chunking chunked embedding ready failed)
+  @processing_states ~w(draft downloading chunking chunked awaiting_analysis analyzing embedding ready failed)
   @processing_transitions %{
     # Wildcard: any state can reset to draft (for stuck jobs)
     "*" => ["draft"],
-    "draft" => ["downloading"],
+    "draft" => ["downloading", "awaiting_analysis"],
     "downloading" => ["chunking", "failed"],
     "chunking" => ["chunked", "failed"],
     "chunked" => ["embedding"],
+    "awaiting_analysis" => ["analyzing", "failed"],
+    "analyzing" => ["chunked", "failed"],
     "embedding" => ["ready", "failed"],
     "failed" => ["draft"]
   }
@@ -73,6 +75,7 @@ defmodule Playground.Files.File do
 
   schema "files" do
     belongs_to :connector_organization, Playground.Connectors.ConnectorOrganization
+    belongs_to :category, Playground.Files.Category
 
     # File metadata from connector
     field :provider_file_id, :string
@@ -85,6 +88,9 @@ defmodule Playground.Files.File do
     # User selection
     field :sync_status, :string, default: "unsynced"
     field :synced_at, :utc_datetime
+
+    # AI Analysis
+    field :ai_summary, :string
 
     # Processing pipeline
     field :processing_status, :string, default: "draft"
@@ -111,6 +117,7 @@ defmodule Playground.Files.File do
     file
     |> cast(attrs, [
       :connector_organization_id,
+      :category_id,
       :provider_file_id,
       :parent_folder_id,
       :name,
@@ -119,6 +126,7 @@ defmodule Playground.Files.File do
       :sync_status,
       :metadata,
       :synced_at,
+      :ai_summary,
       :processing_status,
       :processing_claim_id,
       :processing_claimed_at,
@@ -221,6 +229,17 @@ defmodule Playground.Files.File do
     file
   end
 
+  # PDF-specific states
+  def after_transition(%__MODULE__{} = file, "awaiting_analysis", _metadata) do
+    broadcast_file_event(file, :file_awaiting_analysis)
+    file
+  end
+
+  def after_transition(%__MODULE__{} = file, "analyzing", _metadata) do
+    broadcast_file_event(file, :file_analyzing)
+    file
+  end
+
   def after_transition(%__MODULE__{} = file, "failed", _metadata) do
     broadcast_file_event(file, :file_failed)
     file
@@ -275,7 +294,7 @@ defmodule Playground.Files.File do
     end
   end
 
-  defp maybe_set_claim(changeset, "downloading", metadata) do
+  defp maybe_set_claim(changeset, state, metadata) when state in ["downloading", "analyzing"] do
     claim_id = Map.get(metadata, :claim_id) || Ecto.UUID.generate()
 
     changeset

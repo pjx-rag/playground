@@ -33,30 +33,34 @@ defmodule Playground.Files.Processing do
 
   """
   def sync_and_enqueue(file_ids) when is_list(file_ids) do
-    Repo.transaction(fn ->
-      now = DateTime.utc_now()
+    # First update sync status in transaction
+    {count, _} =
+      Repo.transaction(fn ->
+        now = DateTime.utc_now()
 
-      # Update sync status and reset processing status
-      {count, _} =
-        from(f in File, where: f.id in ^file_ids)
-        |> Repo.update_all(
-          set: [
-            sync_status: "synced",
-            synced_at: now,
-            processing_status: "draft",
-            updated_at: now
-          ]
-        )
+        # Update sync status and reset processing status
+        result =
+          from(f in File, where: f.id in ^file_ids)
+          |> Repo.update_all(
+            set: [
+              sync_status: "synced",
+              synced_at: now,
+              processing_status: "draft",
+              updated_at: now
+            ]
+          )
 
-      # Enqueue chunking jobs for each file
-      files = from(f in File, where: f.id in ^file_ids) |> Repo.all()
-
-      Enum.each(files, fn file ->
-        enqueue_chunking_job(file)
+        result
       end)
 
-      count
+    # Then enqueue jobs OUTSIDE the transaction (avoids Machinery GenServer deadlock)
+    files = from(f in File, where: f.id in ^file_ids) |> Repo.all()
+
+    Enum.each(files, fn file ->
+      enqueue_chunking_job(file)
     end)
+
+    {:ok, count}
   end
 
   # Private: Enqueue appropriate chunking worker based on MIME type
@@ -70,8 +74,8 @@ defmodule Playground.Files.Processing do
         enqueue_worker(Playground.RAG.Workers.ProcessTextFileWorker, file.id, organization_id)
 
       file.mime_type == "application/pdf" ->
-        # TODO: Implement ProcessPdfFileWorker
-        :ok
+        # PDFs go directly to awaiting_analysis (batch job will pick them up)
+        Machinery.transition_to(file, File, "awaiting_analysis")
 
       true ->
         # Default to text worker for unknown types

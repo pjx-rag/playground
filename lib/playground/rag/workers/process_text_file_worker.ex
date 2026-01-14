@@ -133,8 +133,8 @@ defmodule Playground.RAG.Workers.ProcessTextFileWorker do
           file_name: file.name
         )
 
-        # Log claim event
-        EventLogger.log_claim(file.id, claim_id, file.processing_revision)
+        # Log claim event (draft → downloading)
+        EventLogger.log_claim(file.id, claim_id, file.processing_revision, "draft", "downloading")
 
         # Step 2: Download and chunk the file
         case download_and_chunk(file, claim_id, start_ms) do
