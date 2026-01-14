@@ -26,8 +26,12 @@ Settings.seed_default_themes()
 IO.puts("Default themes seeded!")
 
 IO.puts("Seeding default app settings...")
-Settings.seed_default_app_settings()
+Code.require_file("seeds/app_settings.exs", __DIR__)
 IO.puts("Default app settings seeded!")
+
+IO.puts("Seeding document categories...")
+Code.require_file("seeds/categories.exs", __DIR__)
+IO.puts("Document categories seeded!")
 
 # Create PJX organization
 IO.puts("Creating PJX organization...")
