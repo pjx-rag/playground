@@ -4,6 +4,9 @@ defmodule Playground.Services.OpenRouterEmbeddings do
 
   Generates embeddings for text chunks using OpenAI's embedding models via OpenRouter.
 
+  Note: Uses raw Req instead of ReqLLM because OpenRouter embedding models
+  are not in LLMDB registry. ReqLLM requires models to be registered.
+
   ## Configuration
 
   The embedding model and dimensions are configured via app settings:
@@ -73,7 +76,6 @@ defmodule Playground.Services.OpenRouterEmbeddings do
     api_key = System.get_env("OPENROUTER_API_KEY")
 
     if api_key do
-      # Build request
       url = "#{@api_base}/embeddings"
 
       headers = [
@@ -87,31 +89,24 @@ defmodule Playground.Services.OpenRouterEmbeddings do
         dimensions: String.to_integer(dimensions)
       }
 
-      # Make request using Req
+      Logger.debug("Creating embeddings: model=#{model}, texts=#{length(texts)}")
+
       case Req.post(url, json: body, headers: headers) do
         {:ok, %{status: 200, body: response}} ->
-          # Extract embeddings from response
-          # OpenRouter returns: %{"data" => [%{"embedding" => [0.1, 0.2, ...]}, ...]}
           embeddings =
             response
             |> Map.get("data", [])
             |> Enum.map(fn item -> Map.get(item, "embedding") end)
 
+          Logger.debug("Embeddings created: #{length(embeddings)} vectors")
           {:ok, embeddings}
 
         {:ok, %{status: status, body: body}} ->
-          Logger.error("OpenRouter API error",
-            status: status,
-            body: inspect(body)
-          )
-
+          Logger.error("OpenRouter API error", status: status, body: inspect(body))
           {:error, {:api_error, status, body}}
 
         {:error, reason} ->
-          Logger.error("OpenRouter API request failed",
-            reason: inspect(reason)
-          )
-
+          Logger.error("OpenRouter API request failed", reason: inspect(reason))
           {:error, {:request_failed, reason}}
       end
     else

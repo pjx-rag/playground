@@ -182,6 +182,68 @@ defmodule Playground.Services.OpenRouter do
   end
 
   @doc """
+  Non-streaming chat completion from OpenRouter using ReqLLM.
+
+  Used by RAG agent pipeline for simple LLM calls (gate, decompose, rerank steps).
+
+  ## Parameters
+    - messages: List of message maps with :role and :content
+    - opts: Optional parameters
+      - model: Model ID (defaults to "anthropic/claude-3.5-haiku")
+      - max_tokens: Maximum tokens to generate (defaults to 1000)
+      - temperature: Sampling temperature (defaults to 0.0 for deterministic output)
+
+  ## Returns
+    - `{:ok, String.t()}` - The complete response text
+    - `{:error, reason}` - Error details
+
+  ## Example
+
+      {:ok, answer} = OpenRouter.chat(
+        [%{role: "user", content: "Is this a question about documents? Answer yes or no."}],
+        model: "anthropic/claude-3.5-haiku"
+      )
+  """
+  def chat(messages, opts \\ []) do
+    model = Keyword.get(opts, :model, "anthropic/claude-3.5-haiku")
+    max_tokens = Keyword.get(opts, :max_tokens, 1000)
+    temperature = Keyword.get(opts, :temperature, 0.0)
+
+    model_spec = "openrouter:#{model}"
+    start_time = System.monotonic_time(:millisecond)
+
+    req_opts = [
+      temperature: temperature,
+      max_tokens: max_tokens,
+      provider_options: [
+        app_referer: "https://playground.local",
+        app_title: "Playground AI Chat"
+      ]
+    ]
+
+    Logger.debug("OpenRouter chat request: model=#{model}, messages=#{length(messages)}")
+
+    case ReqLLM.generate_text(model_spec, messages, req_opts) do
+      {:ok, response} ->
+        content = ReqLLM.Response.text(response) || ""
+        duration_ms = System.monotonic_time(:millisecond) - start_time
+
+        # Log API call with usage/cost info
+        log_api_call(model, messages, response, duration_ms, true)
+
+        Logger.debug("OpenRouter chat completed: #{String.length(content)} chars")
+        {:ok, content}
+
+      {:error, reason} = error ->
+        duration_ms = System.monotonic_time(:millisecond) - start_time
+        log_api_error(model, messages, reason, duration_ms)
+
+        Logger.error("OpenRouter chat failed: #{inspect(reason)}")
+        error
+    end
+  end
+
+  @doc """
   Lists available models from OpenRouter.
 
   Returns a list of models with their capabilities and pricing.
@@ -250,5 +312,79 @@ defmodule Playground.Services.OpenRouter do
 
   defp normalize_response({:error, exception}) do
     {:error, %{reason: exception, message: Exception.message(exception)}}
+  end
+
+  # =============================================================================
+  # API Logging
+  # =============================================================================
+
+  defp log_api_call(model, messages, response, duration_ms, success) do
+    usage = response.usage || %{}
+
+    log_data = %{
+      service: service_name(),
+      method: "POST",
+      path: "/chat/completions",
+      url: "#{base_url()}/chat/completions",
+      status_code: "200",
+      duration_ms: duration_ms,
+      success: success,
+      request_headers: %{"content-type" => "application/json"},
+      request_body: Jason.encode!(%{model: model, messages: format_messages_for_log(messages)}),
+      response_body: Jason.encode!(%{
+        model: model,
+        usage: usage,
+        content_length: String.length(ReqLLM.Response.text(response) || "")
+      }),
+      cost_usd: Decimal.from_float(usage[:total_cost] || 0.0),
+      tokens_prompt: usage[:input_tokens],
+      tokens_completion: usage[:output_tokens],
+      tokens_total: usage[:total_tokens],
+      metadata: %{
+        model: model,
+        cached_tokens: usage[:cached_tokens],
+        reasoning_tokens: usage[:reasoning_tokens]
+      }
+    }
+
+    persist_log(log_data)
+  end
+
+  defp log_api_error(model, messages, reason, duration_ms) do
+    log_data = %{
+      service: service_name(),
+      method: "POST",
+      path: "/chat/completions",
+      url: "#{base_url()}/chat/completions",
+      status_code: "error",
+      duration_ms: duration_ms,
+      success: false,
+      request_headers: %{"content-type" => "application/json"},
+      request_body: Jason.encode!(%{model: model, messages: format_messages_for_log(messages)}),
+      error_message: inspect(reason)
+    }
+
+    persist_log(log_data)
+  end
+
+  defp format_messages_for_log(messages) do
+    # Store full message content for complete API request logs
+    Enum.map(messages, fn msg ->
+      content = msg[:content] || msg["content"] || ""
+      %{role: msg[:role] || msg["role"], content: content}
+    end)
+  end
+
+  defp persist_log(log_data) do
+    Task.start(fn ->
+      try do
+        %Playground.APIRequestLog{}
+        |> Playground.APIRequestLog.changeset(log_data)
+        |> Playground.Repo.insert()
+      rescue
+        e ->
+          Logger.warning("Failed to persist API request log: #{inspect(e)}")
+      end
+    end)
   end
 end
