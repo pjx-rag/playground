@@ -41,6 +41,8 @@ defmodule Playground.RAG.Agent do
   Each LLM call automatically logged via OpenRouter service.
   """
 
+  require Logger
+
   alias Playground.RAG.Search
   alias Playground.Services.OpenRouter
   alias Playground.Services.OpenRouterEmbeddings

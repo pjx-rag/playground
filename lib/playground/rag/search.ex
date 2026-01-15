@@ -221,6 +221,7 @@ defmodule Playground.RAG.Search do
   """
   def fulltext_only(query_text, organization_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, @default_limit)
+    sanitized_query = sanitize_search_query(query_text)
 
     query =
       from(c in Chunk,
@@ -234,14 +235,14 @@ defmodule Playground.RAG.Search do
           fragment(
             "? @@ websearch_to_tsquery('english', ?)",
             c.search_vector,
-            ^query_text
+            ^sanitized_query
           ),
         order_by: [
           desc:
             fragment(
               "ts_rank(?, websearch_to_tsquery('english', ?))",
               c.search_vector,
-              ^query_text
+              ^sanitized_query
             )
         ],
         limit: ^limit,
@@ -254,14 +255,14 @@ defmodule Playground.RAG.Search do
             fragment(
               "ts_rank(?, websearch_to_tsquery('english', ?))",
               c.search_vector,
-              ^query_text
+              ^sanitized_query
             ),
           norm_fulltext: 1.0,
           hybrid_score:
             fragment(
               "ts_rank(?, websearch_to_tsquery('english', ?))",
               c.search_vector,
-              ^query_text
+              ^sanitized_query
             )
         }
       )
@@ -301,15 +302,19 @@ defmodule Playground.RAG.Search do
       |> Map.new(&{&1.id, &1})
 
     # Convert rows to result maps using the preloaded chunks
-    Enum.map(rows, fn row ->
+    # Filter out any chunks that were deleted between queries (race condition protection)
+    rows
+    |> Enum.map(fn row ->
       chunk_id = Enum.at(row, col_indices["id"])
       semantic_score = Enum.at(row, col_indices["semantic_score"])
       fulltext_score = Enum.at(row, col_indices["fulltext_score"])
       norm_fulltext = Enum.at(row, col_indices["norm_fulltext"])
       hybrid_score = Enum.at(row, col_indices["hybrid_score"])
 
-      chunk = Map.get(chunks, chunk_id)
-
+      {Map.get(chunks, chunk_id), semantic_score, fulltext_score, norm_fulltext, hybrid_score}
+    end)
+    |> Enum.reject(fn {chunk, _, _, _, _} -> is_nil(chunk) end)
+    |> Enum.map(fn {chunk, semantic_score, fulltext_score, norm_fulltext, hybrid_score} ->
       %{
         chunk: chunk,
         file: chunk.file,
