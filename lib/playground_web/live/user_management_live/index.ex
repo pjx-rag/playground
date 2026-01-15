@@ -14,7 +14,7 @@ defmodule PlaygroundWeb.UserManagementLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     breadcrumbs = [
-      %{label: "Dashboard", path: ~p"/admin"},
+      %{label: "Admin", path: ~p"/admin"},
       %{label: "Users", path: nil}
     ]
 

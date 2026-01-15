@@ -13,7 +13,7 @@ defmodule PlaygroundWeb.UserManagementLive.Edit do
     user = Accounts.get_user!(id)
 
     breadcrumbs = [
-      %{label: "Dashboard", path: ~p"/admin"},
+      %{label: "Admin", path: ~p"/admin"},
       %{label: "Users", path: ~p"/admin/users"},
       %{label: "Edit User", path: nil}
     ]

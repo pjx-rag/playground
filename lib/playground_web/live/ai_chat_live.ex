@@ -68,6 +68,7 @@ defmodule PlaygroundWeb.AIChatLive do
      |> assign(:streaming_content, "")
      |> assign(:is_streaming, false)
      |> assign(:rate_limit, rate_limit)
+     |> assign(:viewing_chunk, nil)
      |> assign(:page_title, "AI Chat")
      |> assign(:hide_header_padding, true)
      |> assign_header_content()}
@@ -227,6 +228,12 @@ defmodule PlaygroundWeb.AIChatLive do
         end
       end
 
+      if rag_mode = params["rag_mode"] do
+        if rag_mode in ["rag", "agentic_rag"] do
+          Settings.set_app_setting("rag_mode", rag_mode)
+        end
+      end
+
       case params["temperature"] do
         value when value not in [nil, ""] -> Settings.set_app_setting("ai_temperature", value)
         _ -> :ok
@@ -325,6 +332,32 @@ defmodule PlaygroundWeb.AIChatLive do
   end
 
   @impl true
+  def handle_event("delete_all_chats", _params, socket) do
+    current_user = socket.assigns.current_user
+    viewed_user_id = socket.assigns.viewed_user_id
+
+    # Only allow deleting own chats
+    if viewed_user_id == current_user.id do
+      case AI.delete_all_user_chats(current_user) do
+        {:ok, count} ->
+          Logger.info("Deleted #{count} chats for user #{current_user.id}")
+
+          {:noreply,
+           socket
+           |> assign(:chats, [])
+           |> assign(:current_chat, nil)
+           |> assign(:messages, [])
+           |> put_flash(:info, "Deleted #{count} chats")}
+
+        {:error, reason} ->
+          {:noreply, socket |> put_flash(:error, "Failed to delete chats: #{inspect(reason)}")}
+      end
+    else
+      {:noreply, socket |> put_flash(:error, "Cannot delete chats for other users")}
+    end
+  end
+
+  @impl true
   def handle_event("change_viewed_user", %{"user_id" => user_id}, socket) do
     path =
       case user_id do
@@ -334,6 +367,17 @@ defmodule PlaygroundWeb.AIChatLive do
       end
 
     {:noreply, push_navigate(socket, to: path)}
+  end
+
+  @impl true
+  def handle_event("view_chunk", %{"chunk_id" => chunk_id}, socket) do
+    case Playground.Repo.get(Playground.RAG.Chunk, chunk_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Chunk not found")}
+
+      chunk ->
+        {:noreply, assign(socket, :viewing_chunk, chunk)}
+    end
   end
 
   @impl true
@@ -458,6 +502,7 @@ defmodule PlaygroundWeb.AIChatLive do
   defp load_ai_settings do
     %{
       default_model: Settings.get_app_setting_value("ai_default_model", "mistralai/devstral-2512:free"),
+      rag_mode: Settings.get_app_setting_value("rag_mode", "agentic_rag"),
       temperature: Settings.get_app_setting_value("ai_temperature", "0.7"),
       max_tokens: Settings.get_app_setting_value("ai_max_tokens", "4096"),
       top_p: Settings.get_app_setting_value("ai_top_p", "1.0"),
@@ -491,17 +536,68 @@ defmodule PlaygroundWeb.AIChatLive do
           <span class="text-sm text-muted-foreground">Select or create a chat</span>
         <% end %>
       </div>
-      <.button
-        variant="ghost"
-        size="sm"
-        phx-click={Fluxon.open_dialog("chat-history-sheet")}
-      >
-        <.icon name="hero-bars-3" class="size-5" />
-        <span class="sr-only">Chat history</span>
-      </.button>
+      <div class="flex items-center gap-1">
+        <%= if @viewed_user_id == @current_user.id do %>
+          <.button
+            variant="ghost"
+            size="sm"
+            phx-click="new_chat"
+          >
+            <.icon name="hero-plus" class="size-5" />
+            <span class="sr-only">New chat</span>
+          </.button>
+        <% end %>
+        <%= if @is_admin do %>
+          <.button
+            variant="ghost"
+            size="sm"
+            phx-click={Fluxon.open_dialog("ai-settings-sheet")}
+          >
+            <.icon name="hero-cog-6-tooth" class="size-5" />
+            <span class="sr-only">AI Settings</span>
+          </.button>
+        <% end %>
+        <.button
+          variant="ghost"
+          size="sm"
+          phx-click={Fluxon.open_dialog("chat-history-sheet")}
+        >
+          <.icon name="hero-bars-3" class="size-5" />
+          <span class="sr-only">Chat history</span>
+        </.button>
+      </div>
     </div>
     """
 
     assign(socket, :header_content, header_content)
   end
+
+  @doc """
+  Extracts citation numbers referenced in the message content.
+  Parses patterns like [1], [2], [10] from the text.
+  """
+  def extract_used_citations(content) when is_binary(content) do
+    ~r/\[(\d+)\]/
+    |> Regex.scan(content)
+    |> Enum.map(fn [_, num] -> String.to_integer(num) end)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  def extract_used_citations(_), do: []
+
+  @doc """
+  Filters citations to only those actually referenced in the message.
+  """
+  def filter_used_citations(citations, content) when is_list(citations) do
+    used_positions = extract_used_citations(content)
+
+    citations
+    |> Enum.filter(fn citation ->
+      position = citation["position"]
+      position in used_positions
+    end)
+  end
+
+  def filter_used_citations(_, _), do: []
 end
