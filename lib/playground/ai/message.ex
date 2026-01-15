@@ -15,6 +15,17 @@ defmodule Playground.AI.Message do
     field :tokens_used, :integer
     field :cost_usd, :decimal
 
+    # RAG pipeline execution data
+    field :rag_mode, :string
+    field :skip_retrieval, :boolean
+    field :needs_retrieval, :boolean
+    field :context_sufficient, :boolean
+    field :reason_iterations, :integer
+    field :sub_questions, {:array, :string}
+    field :num_chunks_retrieved, :integer
+    field :chunks_used, :integer
+    field :rag_debug_data, :map
+
     belongs_to :chat, Playground.AI.Chat
     belongs_to :api_request_log, Playground.APIRequestLog
 
@@ -24,7 +35,23 @@ defmodule Playground.AI.Message do
   @doc false
   def changeset(message, attrs) do
     message
-    |> cast(attrs, [:role, :content, :tokens_used, :cost_usd, :chat_id, :api_request_log_id])
+    |> cast(attrs, [
+      :role,
+      :content,
+      :tokens_used,
+      :cost_usd,
+      :chat_id,
+      :api_request_log_id,
+      :rag_mode,
+      :skip_retrieval,
+      :needs_retrieval,
+      :context_sufficient,
+      :reason_iterations,
+      :sub_questions,
+      :num_chunks_retrieved,
+      :chunks_used,
+      :rag_debug_data
+    ])
     |> validate_required([:role, :content, :chat_id])
     |> validate_inclusion(:role, ["user", "assistant"])
     |> validate_length(:content, max: 32_000, message: "Message is too long (maximum 32,000 characters)")

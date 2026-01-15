@@ -141,6 +141,19 @@ defmodule Playground.AI.Chats do
   end
 
   @doc """
+  Deletes all chats for a user.
+
+  Returns `{:ok, count}` where count is the number of deleted chats.
+  """
+  def delete_all(%User{} = user) do
+    query = from(c in Chat, where: c.user_id == ^user.id)
+
+    case Repo.delete_all(query) do
+      {count, _} -> {:ok, count}
+    end
+  end
+
+  @doc """
   Returns an `%Ecto.Changeset{}` for tracking chat changes.
   """
   def change(%Chat{} = chat, attrs \\ %{}) do

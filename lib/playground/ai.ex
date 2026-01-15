@@ -39,6 +39,9 @@ defmodule Playground.AI do
   @doc "See `AI.Chats.delete/2`"
   defdelegate delete_chat(chat, user), to: Chats, as: :delete
 
+  @doc "See `AI.Chats.delete_all/1`"
+  defdelegate delete_all_user_chats(user), to: Chats, as: :delete_all
+
   @doc "See `AI.Chats.change/2`"
   defdelegate change_chat(chat, attrs \\ %{}), to: Chats, as: :change
 
@@ -60,6 +63,10 @@ defmodule Playground.AI do
 
   @doc "See `AI.Messages.create_assistant_message/5`"
   defdelegate create_assistant_message(chat, content, tokens_used, cost_usd, api_request_log_id),
+    to: Messages
+
+  @doc "See `AI.Messages.create_assistant_message/6`"
+  defdelegate create_assistant_message(chat, content, tokens_used, cost_usd, api_request_log_id, rag_attrs),
     to: Messages
 
   # ============================================================================

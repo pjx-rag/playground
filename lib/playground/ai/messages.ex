@@ -122,16 +122,19 @@ defmodule Playground.AI.Messages do
         content,
         tokens_used,
         cost_usd,
-        api_request_log_id
+        api_request_log_id,
+        rag_attrs \\ %{}
       ) do
-    message_attrs = %{
-      chat_id: chat.id,
-      role: "assistant",
-      content: content,
-      tokens_used: tokens_used,
-      cost_usd: cost_usd,
-      api_request_log_id: api_request_log_id
-    }
+    message_attrs =
+      %{
+        chat_id: chat.id,
+        role: "assistant",
+        content: content,
+        tokens_used: tokens_used,
+        cost_usd: cost_usd,
+        api_request_log_id: api_request_log_id
+      }
+      |> Map.merge(rag_attrs)
 
     with {:ok, message} <- %Message{} |> Message.changeset(message_attrs) |> Repo.insert(),
          {:ok, _chat} <- Playground.AI.Chats.update(chat, %{is_processing: false}) do
