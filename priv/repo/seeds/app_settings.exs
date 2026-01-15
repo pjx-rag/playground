@@ -43,6 +43,18 @@ app_settings = [
   %{
     key: "rag_mode",
     value: "agentic_rag"
+  },
+  %{
+    key: "rag_agent_model",
+    value: "anthropic/claude-3.5-haiku"
+  },
+  %{
+    key: "rag_debug_mode",
+    value: "false"
+  },
+  %{
+    key: "api_log_truncate_length",
+    value: "2000"
   }
 ]
 

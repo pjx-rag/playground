@@ -21,6 +21,7 @@ config :playground, Oban,
     process_text_file: 20,
     process_pdf_file: 3,
     process_office_file: 5,
+    pdf_batch_analyzer: 1,
     embed_poller: 1,
     embed_chunks: 5
   ],
@@ -39,6 +40,8 @@ config :playground, Oban,
     {"*/5 * * * *", Playground.ApiTokens.Workers.TokenRefreshWorker, args: %{}},
     # Poll for chunked files ready for embedding every minute
     {"* * * * *", Playground.RAG.Workers.EmbedChunksPoller, args: %{}},
+    # Batch analyze PDFs awaiting AI processing every minute
+    {"* * * * *", Playground.RAG.Workers.PdfBatchAnalyzer, args: %{}},
     # Clean up expired OAuth states every hour
     {"0 * * * *", Playground.OAuth.CleanupExpiredStatesWorker, args: %{}}
   ]

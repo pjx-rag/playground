@@ -18,6 +18,11 @@ Phoenix starter kit with auth, authorization, background jobs, and admin dashboa
    neon auth
    ```
 
+3. **Poppler Utils** (for PDF text extraction)
+   ```bash
+   brew install poppler
+   ```
+
 ### Setup Steps
 
 1. **Install dependencies**

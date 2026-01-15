@@ -78,6 +78,7 @@ FROM ${RUNNER_IMAGE}
 
 RUN apt-get update -y && \
   apt-get install -y libstdc++6 openssl libncurses5 locales ca-certificates curl gnupg \
+  poppler-utils \
   && apt-get clean && rm -f /var/lib/apt/lists/*_*
 
 # Install Doppler CLI
