@@ -35,6 +35,8 @@ defmodule Playground.RAG.Pipeline do
   - Best for complex questions requiring reasoning
   """
 
+  require Logger
+
   alias Playground.RAG.Agent
   alias Playground.Settings
 

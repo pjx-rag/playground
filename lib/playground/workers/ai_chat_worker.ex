@@ -440,13 +440,11 @@ defmodule Playground.Workers.AIChatWorker do
     end)
   end
 
-  @doc """
-  Forces the processing flag to be cleared using a direct SQL update.
-
-  This guarantees the flag is cleared even if the chat record is stale or has
-  other issues. Used as a last resort to prevent chats from being stuck in
-  processing state forever.
-  """
+  # Forces the processing flag to be cleared using a direct SQL update.
+  #
+  # This guarantees the flag is cleared even if the chat record is stale or has
+  # other issues. Used as a last resort to prevent chats from being stuck in
+  # processing state forever.
   defp force_clear_processing_flag(chat) do
     import Ecto.Query
     alias Playground.Repo
@@ -458,14 +456,12 @@ defmodule Playground.Workers.AIChatWorker do
     Logger.info("Forced clear of processing flag for chat #{chat.id}")
   end
 
-  @doc """
-  Gets the organization ID for RAG search.
-
-  Currently defaults to organization 1 (PJX) for all users.
-  TODO: Update when multi-tenancy is fully implemented:
-    - Option 1: Add organization_id to User schema
-    - Option 2: Add organization_id to Chat schema for org-specific chats
-  """
+  # Gets the organization ID for RAG search.
+  #
+  # Currently defaults to organization 1 (PJX) for all users.
+  # TODO: Update when multi-tenancy is fully implemented:
+  #   - Option 1: Add organization_id to User schema
+  #   - Option 2: Add organization_id to Chat schema for org-specific chats
   defp get_organization_id(_chat) do
     # Default to organization 1 (PJX) for now
     # This will need to be updated when proper multi-tenancy is added

@@ -273,7 +273,7 @@ defmodule Playground.RAG.Search do
 
   # Private Functions
 
-  defp maybe_generate_embedding(text, :fulltext), do: {:ok, nil}
+  defp maybe_generate_embedding(_text, :fulltext), do: {:ok, nil}
 
   defp maybe_generate_embedding(text, _mode) do
     case OpenRouterEmbeddings.create_embeddings([text]) do
@@ -326,12 +326,10 @@ defmodule Playground.RAG.Search do
     end)
   end
 
-  @doc """
-  Sanitizes search query text to prevent injection and handle malformed input.
-
-  Removes special characters that could cause issues with websearch_to_tsquery,
-  limits length, and handles edge cases.
-  """
+  # Sanitizes search query text to prevent injection and handle malformed input.
+  #
+  # Removes special characters that could cause issues with websearch_to_tsquery,
+  # limits length, and handles edge cases.
   defp sanitize_search_query(text) when is_binary(text) do
     text
     |> String.trim()

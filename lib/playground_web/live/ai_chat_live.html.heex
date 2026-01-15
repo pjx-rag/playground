@@ -11,7 +11,7 @@
               <div class={"px-4 py-3 #{if message.role == "user", do: "bg-primary text-foreground-primary rounded-2xl rounded-br-sm", else: "bg-card border border-base text-foreground shadow-sm rounded-2xl rounded-bl-sm"}"}>
                 <%= if message.role == "assistant" do %>
                   <div class="prose prose-sm max-w-none dark:prose-invert">
-                    {raw(MDEx.to_html!(message.content, sanitize: MDEx.default_sanitize_options()))}
+                    {raw(MDEx.to_html!(message.content, sanitize: MDEx.Document.default_sanitize_options()))}
                   </div>
                 <% else %>
                   <div>{message.content}</div>
@@ -81,7 +81,7 @@
             <div class="max-w-[85%] md:max-w-3xl px-4 py-3 rounded-2xl rounded-bl-sm bg-card border border-base text-foreground shadow-sm">
               <%= if @streaming_content != "" do %>
                 <div class="prose prose-sm max-w-none dark:prose-invert">
-                  {raw(MDEx.to_html!(@streaming_content, sanitize: MDEx.default_sanitize_options()))}
+                  {raw(MDEx.to_html!(@streaming_content, sanitize: MDEx.Document.default_sanitize_options()))}
                 </div>
               <% end %>
               <div class="mt-2 flex items-center text-xs text-muted-foreground">

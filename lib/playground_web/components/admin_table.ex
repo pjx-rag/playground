@@ -463,10 +463,8 @@ defmodule PlaygroundWeb.Components.AdminTable do
     """
   end
 
-  @doc """
-  A simple checkbox for table row selection that properly handles phx-click events.
-  Uses a label wrapper to ensure click events are properly captured.
-  """
+  # A simple checkbox for table row selection that properly handles phx-click events.
+  # Uses a label wrapper to ensure click events are properly captured.
   attr :name, :string, required: true
   attr :checked, :boolean, default: false
   attr :rest, :global, include: ~w(phx-click phx-target phx-value-id)
