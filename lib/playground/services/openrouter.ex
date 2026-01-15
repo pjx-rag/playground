@@ -293,8 +293,10 @@ defmodule Playground.Services.OpenRouter do
   defp api_key do
     case Application.get_env(:playground, :openrouter)[:api_key] do
       nil ->
-        Logger.warning("OPENROUTER_API_KEY not configured")
-        ""
+        raise "OPENROUTER_API_KEY not configured. Please set the environment variable."
+
+      "" ->
+        raise "OPENROUTER_API_KEY is empty. Please provide a valid API key."
 
       key ->
         key

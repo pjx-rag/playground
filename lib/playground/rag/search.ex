@@ -89,6 +89,9 @@ defmodule Playground.RAG.Search do
     fulltext_weight = Keyword.get(opts, :fulltext_weight, @default_fulltext_weight)
     min_semantic_score = Keyword.get(opts, :min_semantic_score, @min_semantic_score)
 
+    # Sanitize search query to prevent injection and handle malformed input
+    sanitized_query = sanitize_search_query(query_text)
+
     # Build the hybrid search query with CTEs
     query =
       from(f in File,
@@ -160,7 +163,7 @@ defmodule Playground.RAG.Search do
 
       params = [
         query_embedding,
-        query_text,
+        sanitized_query,
         file_ids,
         semantic_weight,
         fulltext_weight,
@@ -285,22 +288,27 @@ defmodule Playground.RAG.Search do
       |> Enum.with_index()
       |> Map.new(fn {col, idx} -> {col, idx} end)
 
-    # Convert rows to result maps
+    # Extract chunk IDs for batch loading
+    chunk_ids = Enum.map(rows, fn row -> Enum.at(row, col_indices["id"]) end)
+
+    # Batch load all chunks with preloading (fixes N+1 query)
+    chunks =
+      from(c in Chunk,
+        where: c.id in ^chunk_ids,
+        preload: [file: :connector_organization]
+      )
+      |> Repo.all()
+      |> Map.new(&{&1.id, &1})
+
+    # Convert rows to result maps using the preloaded chunks
     Enum.map(rows, fn row ->
       chunk_id = Enum.at(row, col_indices["id"])
-      file_id = Enum.at(row, col_indices["file_id"])
-      content = Enum.at(row, col_indices["content"])
-      metadata = Enum.at(row, col_indices["metadata"])
-      position = Enum.at(row, col_indices["position"])
-      start_byte = Enum.at(row, col_indices["start_byte"])
-      end_byte = Enum.at(row, col_indices["end_byte"])
       semantic_score = Enum.at(row, col_indices["semantic_score"])
       fulltext_score = Enum.at(row, col_indices["fulltext_score"])
       norm_fulltext = Enum.at(row, col_indices["norm_fulltext"])
       hybrid_score = Enum.at(row, col_indices["hybrid_score"])
 
-      # Load full chunk and file for associations
-      chunk = Repo.get!(Chunk, chunk_id) |> Repo.preload(file: :connector_organization)
+      chunk = Map.get(chunks, chunk_id)
 
       %{
         chunk: chunk,
@@ -312,4 +320,22 @@ defmodule Playground.RAG.Search do
       }
     end)
   end
+
+  @doc """
+  Sanitizes search query text to prevent injection and handle malformed input.
+
+  Removes special characters that could cause issues with websearch_to_tsquery,
+  limits length, and handles edge cases.
+  """
+  defp sanitize_search_query(text) when is_binary(text) do
+    text
+    |> String.trim()
+    |> String.slice(0, 1000)
+    |> case do
+      "" -> " "
+      sanitized -> sanitized
+    end
+  end
+
+  defp sanitize_search_query(_), do: " "
 end

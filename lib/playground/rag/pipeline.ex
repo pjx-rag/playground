@@ -69,10 +69,15 @@ defmodule Playground.RAG.Pipeline do
           run_simple_rag(ctx)
       end
 
+    # Reverse metadata steps to restore chronological order (prepended during execution)
+    result_ctx = update_in(result_ctx.metadata.steps, &Enum.reverse/1)
+
     {:ok, result_ctx}
   rescue
     e ->
-      {:error, e}
+      Logger.error("RAG pipeline failed: #{Exception.message(e)}")
+      Logger.error("Stacktrace: #{Exception.format_stacktrace(__STACKTRACE__)}")
+      {:error, %{exception: e, message: Exception.message(e), stacktrace: __STACKTRACE__}}
   end
 
   @doc """

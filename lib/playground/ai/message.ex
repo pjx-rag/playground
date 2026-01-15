@@ -55,7 +55,26 @@ defmodule Playground.AI.Message do
     |> validate_required([:role, :content, :chat_id])
     |> validate_inclusion(:role, ["user", "assistant"])
     |> validate_length(:content, max: 32_000, message: "Message is too long (maximum 32,000 characters)")
+    |> validate_rag_mode()
+    |> validate_rag_numeric_fields()
     |> foreign_key_constraint(:chat_id)
     |> foreign_key_constraint(:api_request_log_id)
+  end
+
+  # Validate RAG mode is one of the allowed values
+  defp validate_rag_mode(changeset) do
+    case get_field(changeset, :rag_mode) do
+      nil -> changeset
+      mode when mode in ["rag", "agentic_rag"] -> changeset
+      _ -> add_error(changeset, :rag_mode, "must be 'rag' or 'agentic_rag'")
+    end
+  end
+
+  # Validate RAG numeric fields are non-negative
+  defp validate_rag_numeric_fields(changeset) do
+    changeset
+    |> validate_number(:reason_iterations, greater_than_or_equal_to: 0)
+    |> validate_number(:num_chunks_retrieved, greater_than_or_equal_to: 0)
+    |> validate_number(:chunks_used, greater_than_or_equal_to: 0)
   end
 end

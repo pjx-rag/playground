@@ -131,7 +131,9 @@ defmodule Playground.RAG.Agent do
     prompt = """
     You are a gating agent for a document knowledge base. Decide if the user's question might benefit from searching uploaded documents.
 
-    Question: #{ctx.question}
+    <user_question>
+    #{ctx.question}
+    </user_question>
 
     Respond with ONLY "yes" or "no":
     - "yes" if the question asks about specific people, events, data, or facts that could be in documents
@@ -175,7 +177,9 @@ defmodule Playground.RAG.Agent do
     prompt = """
     You are a query decomposition agent. Break down complex questions into simpler sub-questions.
 
-    Question: #{ctx.question}
+    <user_question>
+    #{ctx.question}
+    </user_question>
 
     If the question is already simple and focused, respond with just the original question.
     If the question has multiple parts, list each sub-question on a new line.
@@ -309,9 +313,15 @@ defmodule Playground.RAG.Agent do
       |> Enum.join("\n\n---\n\n")
 
     prompt = """
-    Rate each chunk's relevance to this question: #{ctx.question}
+    Rate each chunk's relevance to this question.
 
+    <user_question>
+    #{ctx.question}
+    </user_question>
+
+    <chunks>
     #{chunks_text}
+    </chunks>
 
     For each chunk 1-#{length(chunks_to_rank)}, provide a relevance score 0-10:
     - 10: Directly answers the question (contains names, facts being asked)
@@ -329,19 +339,35 @@ defmodule Playground.RAG.Agent do
           response
           |> String.split("\n", trim: true)
           |> Enum.map(&String.trim/1)
-          |> Enum.map(fn line ->
+          |> Enum.with_index(1)
+          |> Enum.map(fn {line, idx} ->
             # Extract just the number, handling formats like "1. 8" or "8" or "[1] 8"
             case Regex.run(~r/(\d+)\s*$/, line) do
-              [_, num] -> String.to_integer(num)
+              [_, num] ->
+                String.to_integer(num)
+
               _ ->
                 case Integer.parse(line) do
-                  {score, _} -> score
-                  :error -> 0
+                  {score, _} ->
+                    score
+
+                  :error ->
+                    Logger.warning("Failed to parse rerank score for chunk #{idx}: #{inspect(line)}")
+                    0
                 end
             end
           end)
 
-        # Combine chunks with scores
+        # Validate score count matches chunk count
+        if length(scores) != length(chunks_to_rank) do
+          Logger.warning(
+            "Rerank score count mismatch: got #{length(scores)} scores for #{length(chunks_to_rank)} chunks"
+          )
+        end
+
+        # Combine chunks with scores (pad with 0s if needed)
+        scores = scores ++ List.duplicate(0, max(0, length(chunks_to_rank) - length(scores)))
+
         ranked_chunks =
           chunks_to_rank
           |> Enum.zip(scores)
@@ -513,7 +539,8 @@ defmodule Playground.RAG.Agent do
 
   defp add_metadata_step(ctx, step_name, step_data) do
     step = Map.merge(%{step: step_name, timestamp: DateTime.utc_now()}, step_data)
-    steps = ctx.metadata.steps ++ [step]
+    # Prepend to list (O(1) instead of O(n)) - will reverse at the end
+    steps = [step | ctx.metadata.steps]
     put_in(ctx.metadata.steps, steps)
   end
 

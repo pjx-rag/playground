@@ -86,9 +86,9 @@ defmodule Playground.Workers.AIChatWorker do
             broadcast_event(user_id, chat_id, {:message_completed, error_message})
 
           {:error, save_error} ->
-            # Failed to save error message, clear processing flag and broadcast error
+            # Failed to save error message, force clear processing flag and broadcast error
             Logger.error("Failed to save error message: #{inspect(save_error)}")
-            AI.clear_processing_flag(chat)
+            force_clear_processing_flag(chat)
             # Broadcast both message_failed and error events to ensure UI gets notified
             broadcast_event(user_id, chat_id, {:message_failed, reason})
             broadcast_event(user_id, chat_id, {:error, "Failed to process your request"})
@@ -120,8 +120,10 @@ defmodule Playground.Workers.AIChatWorker do
       end
 
     # Execute RAG pipeline to get relevant context
-    # TODO: Get organization_id from user association when available
-    organization_id = 1  # Default PJX organization
+    # Get organization_id - currently defaults to 1 pending multi-tenancy implementation
+    # TODO: Add organization_id to User schema and retrieve from user.organization_id
+    # TODO: Or add organization_id to Chat schema to support org-specific chats
+    organization_id = get_organization_id(chat)
 
     Logger.info("Executing RAG pipeline", question: user_question, organization_id: organization_id)
 
@@ -436,5 +438,37 @@ defmodule Playground.Workers.AIChatWorker do
       content = msg[:content] || msg["content"] || ""
       %{role: msg[:role] || msg["role"], content: content}
     end)
+  end
+
+  @doc """
+  Forces the processing flag to be cleared using a direct SQL update.
+
+  This guarantees the flag is cleared even if the chat record is stale or has
+  other issues. Used as a last resort to prevent chats from being stuck in
+  processing state forever.
+  """
+  defp force_clear_processing_flag(chat) do
+    import Ecto.Query
+    alias Playground.Repo
+    alias Playground.AI.Chat
+
+    from(c in Chat, where: c.id == ^chat.id)
+    |> Repo.update_all(set: [is_processing: false, updated_at: DateTime.utc_now()])
+
+    Logger.info("Forced clear of processing flag for chat #{chat.id}")
+  end
+
+  @doc """
+  Gets the organization ID for RAG search.
+
+  Currently defaults to organization 1 (PJX) for all users.
+  TODO: Update when multi-tenancy is fully implemented:
+    - Option 1: Add organization_id to User schema
+    - Option 2: Add organization_id to Chat schema for org-specific chats
+  """
+  defp get_organization_id(_chat) do
+    # Default to organization 1 (PJX) for now
+    # This will need to be updated when proper multi-tenancy is added
+    1
   end
 end
