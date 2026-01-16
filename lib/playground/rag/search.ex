@@ -39,7 +39,7 @@ defmodule Playground.RAG.Search do
   alias Playground.Repo
   alias Playground.RAG.Chunk
   alias Playground.Files.File
-  alias Playground.Services.OpenRouterEmbeddings
+  alias Playground.Services.AI.OpenRouterEmbeddings
 
   @default_limit 20
   @default_semantic_weight 0.7

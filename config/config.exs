@@ -43,7 +43,7 @@ config :playground, Oban,
     # Batch analyze PDFs awaiting AI processing every minute
     {"* * * * *", Playground.RAG.Workers.PdfBatchAnalyzer, args: %{}},
     # Clean up expired OAuth states every hour
-    {"0 * * * *", Playground.OAuth.CleanupExpiredStatesWorker, args: %{}}
+    {"0 * * * *", Playground.Services.Connectors.Workers.CleanupExpiredStatesWorker, args: %{}}
   ]
 
 config :playground,

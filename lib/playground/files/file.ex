@@ -74,7 +74,7 @@ defmodule Playground.Files.File do
   }
 
   schema "files" do
-    belongs_to :connector_organization, Playground.Connectors.ConnectorOrganization
+    belongs_to :connector_organization, Playground.Services.Connectors.ConnectorOrganization
     belongs_to :category, Playground.Files.Category
 
     # File metadata from connector

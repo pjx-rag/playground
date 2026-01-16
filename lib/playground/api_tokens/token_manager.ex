@@ -232,7 +232,7 @@ defmodule Playground.ApiTokens.TokenManager do
   # Maps resource types to their service modules
   defp resolve_service_module(%{resource_type: "connector", resource_id: resource_id}) do
     # For connectors, look up which connector type this is
-    connector_org = Playground.Connectors.get_connector_organization!(resource_id)
+    connector_org = Playground.Services.Connectors.get_connector_organization!(resource_id)
     connector = connector_org.connector
 
     case connector.key do

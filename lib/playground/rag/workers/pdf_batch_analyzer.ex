@@ -31,7 +31,8 @@ defmodule Playground.RAG.Workers.PdfBatchAnalyzer do
   alias Playground.Repo
   alias Playground.Files.File
   alias Playground.RAG.{Chunk, ChunkHash, TextChunker, EventLogger}
-  alias Playground.Services.{GoogleDrive, PdfAnalyzer}
+  alias Playground.Services.Integrations.GoogleDrive
+  alias Playground.Services.AI.PdfAnalyzer
   alias Playground.ApiTokens
 
   @batch_size 2

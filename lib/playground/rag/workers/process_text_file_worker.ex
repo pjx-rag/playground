@@ -40,7 +40,7 @@ defmodule Playground.RAG.Workers.ProcessTextFileWorker do
   alias Playground.Repo
   alias Playground.Files.File
   alias Playground.RAG.{Chunk, ChunkHash, TextChunker, EventLogger}
-  alias Playground.Services.GoogleDrive
+  alias Playground.Services.Integrations.GoogleDrive
   alias Playground.ApiTokens
 
   # Native text MIME types that can be downloaded directly

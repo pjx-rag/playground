@@ -9,7 +9,7 @@ defmodule Playground.Workers.DatabaseBackupWorker do
     max_attempts: 3
 
   require Logger
-  alias Playground.Services.ObjectStorage
+  alias Playground.Services.Integrations.ObjectStorage
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: args}) do

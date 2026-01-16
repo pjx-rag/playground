@@ -44,8 +44,8 @@ defmodule Playground.RAG.Agent do
   require Logger
 
   alias Playground.RAG.Search
-  alias Playground.Services.OpenRouter
-  alias Playground.Services.OpenRouterEmbeddings
+  alias Playground.Services.AI.OpenRouter
+  alias Playground.Services.AI.OpenRouterEmbeddings
   alias Playground.Settings
 
   defmodule Context do
@@ -102,8 +102,8 @@ defmodule Playground.RAG.Agent do
   ## Options
 
   - `:search` - Search module (default: Playground.RAG.Search)
-  - `:llm` - LLM service module (default: Playground.Services.OpenRouter)
-  - `:embedder` - Embedder service module (default: Playground.Services.OpenRouterEmbeddings)
+  - `:llm` - LLM service module (default: Playground.Services.AI.OpenRouter)
+  - `:embedder` - Embedder service module (default: Playground.Services.AI.OpenRouterEmbeddings)
   """
   def new(question, organization_id, opts \\ []) do
     %Context{

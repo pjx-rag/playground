@@ -8,10 +8,10 @@ defmodule Playground.Workers.ConnectorSyncWorker do
 
   use Oban.Worker, queue: :default, max_attempts: 3
 
-  alias Playground.Connectors
+  alias Playground.Services.Connectors
   alias Playground.Files
   alias Playground.ApiTokens.TokenManager
-  alias Playground.Services.GoogleDrive
+  alias Playground.Services.Integrations.GoogleDrive
 
   require Logger
 

@@ -18,7 +18,7 @@ defmodule Playground.RAG.EventLog do
 
   schema "event_logs" do
     belongs_to :file, Playground.Files.File
-    has_one :api_request_log, Playground.APIRequestLog
+    has_one :api_request_log, Playground.Services.APIRequestLog
 
     field :event, :string
     field :from_status, :string

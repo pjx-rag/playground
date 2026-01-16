@@ -33,7 +33,7 @@ defmodule Playground.RAG.Workers.EmbedChunksWorker do
   alias Playground.Repo
   alias Playground.Files.File
   alias Playground.RAG.{Chunk, EventLogger}
-  alias Playground.Services.OpenRouterEmbeddings
+  alias Playground.Services.AI.OpenRouterEmbeddings
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"chunk_ids" => chunk_ids, "organization_id" => organization_id}}) do

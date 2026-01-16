@@ -7,7 +7,7 @@ defmodule Playground.Accounts do
   alias Playground.Repo
 
   alias Playground.Accounts.{User, UserToken, UserNotifier}
-  alias Playground.Organizations
+  alias Playground.Accounts.Organizations
 
   ## Database getters
 

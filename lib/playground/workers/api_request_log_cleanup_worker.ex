@@ -13,7 +13,7 @@ defmodule Playground.Workers.APIRequestLogCleanupWorker do
   import Ecto.Query
 
   alias Playground.Repo
-  alias Playground.APIRequestLog
+  alias Playground.Services.APIRequestLog
 
   @default_retention_days 30
 

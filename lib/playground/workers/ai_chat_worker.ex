@@ -24,7 +24,7 @@ defmodule Playground.Workers.AIChatWorker do
   alias Playground.AI
   alias Playground.PubSub
   alias Playground.RAG.Pipeline
-  alias Playground.Services.OpenRouter
+  alias Playground.Services.AI.OpenRouter
 
   require Logger
 
@@ -426,7 +426,7 @@ defmodule Playground.Workers.AIChatWorker do
     }
 
     # Insert synchronously to get the ID
-    case Playground.Repo.insert(Playground.APIRequestLog.changeset(%Playground.APIRequestLog{}, log_data)) do
+    case Playground.Repo.insert(Playground.Services.APIRequestLog.changeset(%Playground.Services.APIRequestLog{}, log_data)) do
       {:ok, log} -> log.id
       {:error, _reason} -> nil
     end
