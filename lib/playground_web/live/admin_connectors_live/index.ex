@@ -1,7 +1,7 @@
 defmodule PlaygroundWeb.AdminConnectorsLive.Index do
   use PlaygroundWeb, :live_view
 
-  alias Playground.Connectors
+  alias Playground.Services.Connectors
 
   import PlaygroundWeb.Components.Layout.PageLayout
 
@@ -62,9 +62,9 @@ defmodule PlaygroundWeb.AdminConnectorsLive.Index do
       case connector.key do
         "google_drive" ->
           # Create secure, database-backed OAuth state
-          case Playground.OAuth.create_state(socket.assigns.current_user.id, connector.id) do
+          case Playground.Services.Connectors.OAuth.create_state(socket.assigns.current_user.id, connector.id) do
             {:ok, state_id} ->
-              Playground.Services.GoogleDrive.authorize_url(state: state_id)
+              Playground.Services.Integrations.GoogleDrive.authorize_url(state: state_id)
 
             {:error, _} ->
               nil
@@ -90,7 +90,7 @@ defmodule PlaygroundWeb.AdminConnectorsLive.Index do
 
     result =
       with {:ok, token} <- Playground.ApiTokens.TokenManager.get_valid_token("connector", connector_org.id),
-           {:ok, health} <- Playground.Services.GoogleDrive.health_check_with_token(token) do
+           {:ok, health} <- Playground.Services.Integrations.GoogleDrive.health_check_with_token(token) do
         {:ok, health}
       else
         {:error, reason} -> {:error, reason}
@@ -108,7 +108,7 @@ defmodule PlaygroundWeb.AdminConnectorsLive.Index do
   @impl true
   def handle_event("test_api_health", %{"key" => "google_drive"}, socket) do
     # Test Google Drive API health WITHOUT using customer tokens
-    case Playground.Services.GoogleDrive.health_check() do
+    case Playground.Services.Integrations.GoogleDrive.health_check() do
       {:ok, %{status: :healthy, latency_ms: latency, oauth_configured: oauth_status}} ->
         config_msg =
           case oauth_status do

@@ -10,7 +10,7 @@ defmodule PlaygroundWeb.AdminFilesLive.Index do
   alias Playground.Repo
   alias Playground.Files.File
   alias Playground.Files.PubSub
-  alias Playground.Organizations
+  alias Playground.Accounts.Organizations
 
   @impl true
   def mount(_params, _session, socket) do
@@ -99,7 +99,7 @@ defmodule PlaygroundWeb.AdminFilesLive.Index do
   defp get_user_connectors(user) do
     org = Organizations.get_user_organization(user)
 
-    from(co in Playground.Connectors.ConnectorOrganization,
+    from(co in Playground.Services.Connectors.ConnectorOrganization,
       where: co.organization_id == ^org.id,
       preload: [:connector]
     )
@@ -107,7 +107,7 @@ defmodule PlaygroundWeb.AdminFilesLive.Index do
   end
 
   defp get_connector_org_ids(organization_id) do
-    from(co in Playground.Connectors.ConnectorOrganization,
+    from(co in Playground.Services.Connectors.ConnectorOrganization,
       where: co.organization_id == ^organization_id,
       select: co.id
     )
@@ -249,7 +249,20 @@ defmodule PlaygroundWeb.AdminFilesLive.Index do
 
   # PubSub message handlers for real-time updates
   @impl true
-  def handle_info({event_type, _file}, socket) when event_type in [:file_updated, :file_processing_started, :file_chunked, :file_failed] do
+  def handle_info({event_type, _file}, socket)
+      when event_type in [
+        :file_updated,
+        :file_processing_started,
+        :file_downloading,
+        :file_chunking,
+        :file_chunked,
+        :file_embedding,
+        :file_ready,
+        :file_awaiting_analysis,
+        :file_analyzing,
+        :file_failed,
+        :file_reset
+      ] do
     # Reload the current page to show updated file status
     # This ensures the file appears with updated processing_status and chunks_count
     {:noreply, load_results(socket, Map.get(socket.assigns.meta, :params, %{}))}
@@ -433,6 +446,10 @@ defmodule PlaygroundWeb.AdminFilesLive.Index do
           <.status_badge status={file.sync_status} />
         </:col>
 
+        <:col :let={file} label="RAG Status" field={:processing_status} sortable>
+          <.processing_status_badge status={file.processing_status} />
+        </:col>
+
         <:col :let={file} label="Size" field={:size_bytes} sortable>
           <span class="text-muted-foreground font-mono text-sm">
             <%= format_file_size(file.size_bytes) %>
@@ -609,6 +626,72 @@ defmodule PlaygroundWeb.AdminFilesLive.Index do
   defp status_badge(assigns) do
     ~H"""
     <.badge color="info"><%= @status %></.badge>
+    """
+  end
+
+  defp processing_status_badge(%{status: "ready"} = assigns) do
+    ~H"""
+    <.badge color="success">Ready</.badge>
+    """
+  end
+
+  defp processing_status_badge(%{status: "chunked"} = assigns) do
+    ~H"""
+    <.badge color="success">Chunked</.badge>
+    """
+  end
+
+  defp processing_status_badge(%{status: "embedding"} = assigns) do
+    ~H"""
+    <.badge color="warning">Embedding</.badge>
+    """
+  end
+
+  defp processing_status_badge(%{status: "chunking"} = assigns) do
+    ~H"""
+    <.badge color="warning">Chunking</.badge>
+    """
+  end
+
+  defp processing_status_badge(%{status: "downloading"} = assigns) do
+    ~H"""
+    <.badge color="info">Downloading</.badge>
+    """
+  end
+
+  defp processing_status_badge(%{status: "awaiting_analysis"} = assigns) do
+    ~H"""
+    <.badge color="info">Awaiting Analysis</.badge>
+    """
+  end
+
+  defp processing_status_badge(%{status: "analyzing"} = assigns) do
+    ~H"""
+    <.badge color="warning">Analyzing</.badge>
+    """
+  end
+
+  defp processing_status_badge(%{status: "failed"} = assigns) do
+    ~H"""
+    <.badge color="danger">Failed</.badge>
+    """
+  end
+
+  defp processing_status_badge(%{status: "draft"} = assigns) do
+    ~H"""
+    <.badge color="info">Draft</.badge>
+    """
+  end
+
+  defp processing_status_badge(%{status: nil} = assigns) do
+    ~H"""
+    <span class="text-muted-foreground">-</span>
+    """
+  end
+
+  defp processing_status_badge(assigns) do
+    ~H"""
+    <.badge color="info"><%= String.capitalize(to_string(@status)) %></.badge>
     """
   end
 

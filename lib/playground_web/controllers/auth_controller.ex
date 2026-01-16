@@ -3,9 +3,9 @@ defmodule PlaygroundWeb.AuthController do
 
   require Logger
 
-  alias Playground.Connectors
+  alias Playground.Services.Connectors
   alias Playground.ApiTokens.TokenManager
-  alias Playground.Organizations
+  alias Playground.Accounts.Organizations
 
   @doc """
   OAuth callback for Google Drive (and future providers).
@@ -13,11 +13,11 @@ defmodule PlaygroundWeb.AuthController do
   Handles the OAuth authorization code exchange and token storage.
   """
   def google_drive_callback(conn, %{"code" => code, "state" => state} = _params) do
-    with {:ok, user_id, connector_id} <- Playground.OAuth.verify_and_consume_state(state),
+    with {:ok, user_id, connector_id} <- Playground.Services.Connectors.OAuth.verify_and_consume_state(state),
          user <- Playground.Accounts.get_user!(user_id),
          connector <- Connectors.get_connector!(connector_id),
          org <- Organizations.get_user_organization(user),
-         {:ok, token_data} <- Playground.Services.GoogleDrive.exchange_code(code),
+         {:ok, token_data} <- Playground.Services.Integrations.GoogleDrive.exchange_code(code),
          {:ok, connector_org} <- create_or_update_connector_org(org, connector, user),
          {:ok, _api_token} <- TokenManager.store_token("connector", connector_org.id, token_data),
          {:ok, _connector_org} <-

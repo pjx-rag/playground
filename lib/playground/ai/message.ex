@@ -27,7 +27,7 @@ defmodule Playground.AI.Message do
     field :rag_debug_data, :map
 
     belongs_to :chat, Playground.AI.Chat
-    belongs_to :api_request_log, Playground.APIRequestLog
+    belongs_to :api_request_log, Playground.Services.APIRequestLog
 
     timestamps(type: :utc_datetime, updated_at: false)
   end

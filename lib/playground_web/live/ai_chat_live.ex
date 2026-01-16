@@ -15,7 +15,7 @@ defmodule PlaygroundWeb.AIChatLive do
   alias Playground.AI
   alias Playground.Accounts
   alias Playground.Authorization
-  alias Playground.Services.OpenRouter
+  alias Playground.Services.AI.OpenRouter
   alias Playground.Settings
 
   require Logger
@@ -45,11 +45,14 @@ defmodule PlaygroundWeb.AIChatLive do
     # Get rate limit stats
     rate_limit = AI.get_usage_stats(viewed_user_id)
 
-    # Fetch available AI models from OpenRouter API
-    available_models = fetch_available_models()
-
     # Load AI default settings for admin panel
     ai_settings = load_ai_settings()
+
+    # Start with default model, fetch full list async to avoid blocking mount
+    default_models = [{"⭐ Mistral Devstral 2 (Recommended)", "mistralai/devstral-2512:free"}]
+
+    # Trigger async model loading only on connected mount
+    if connected?(socket), do: send(self(), :load_available_models)
 
     {:ok,
      socket
@@ -58,7 +61,8 @@ defmodule PlaygroundWeb.AIChatLive do
      |> assign(:viewed_user_id, viewed_user_id)
      |> assign(:viewed_user, viewed_user)
      |> assign(:available_users, available_users)
-     |> assign(:available_models, available_models)
+     |> assign(:available_models, default_models)
+     |> assign(:models_loading, true)
      |> assign(:selected_model, ai_settings.default_model)
      |> assign(:ai_settings, ai_settings)
      |> assign(:chats, chats)
@@ -154,14 +158,34 @@ defmodule PlaygroundWeb.AIChatLive do
           {:ok, _remaining} ->
             case AI.create_user_message(current_chat, content) do
               {:ok, _message} ->
+                # Auto-rename chat on first message if title is still "New Chat"
+                {updated_chat, chats} =
+                  if current_chat.title == "New Chat" and socket.assigns.messages == [] do
+                    title = generate_chat_title(content)
+
+                    case AI.update_chat(current_chat, %{title: title}) do
+                      {:ok, chat} ->
+                        # Reload chats list to reflect the new title
+                        {chat, AI.list_user_chats(current_user.id, current_user)}
+
+                      {:error, _} ->
+                        {current_chat, socket.assigns.chats}
+                    end
+                  else
+                    {current_chat, socket.assigns.chats}
+                  end
+
                 # Reload messages
                 messages = AI.list_messages(current_chat.id)
 
                 {:noreply,
                  socket
+                 |> assign(:current_chat, updated_chat)
+                 |> assign(:chats, chats)
                  |> assign(:messages, messages)
                  |> assign(:input_value, "")
-                 |> assign(:is_streaming, true)}
+                 |> assign(:is_streaming, true)
+                 |> assign_header_content()}
 
               {:error, :chat_is_processing} ->
                 {:noreply,
@@ -191,23 +215,13 @@ defmodule PlaygroundWeb.AIChatLive do
 
   @impl true
   def handle_event("new_chat", _params, socket) do
-    current_user = socket.assigns.current_user
     viewed_user_id = socket.assigns.viewed_user_id
-    # Use the default model from app settings
-    default_model = socket.assigns.ai_settings.default_model
-    Logger.info("Creating new chat with default model: #{default_model}")
+    current_user = socket.assigns.current_user
 
     # Can only create chats for own account
     if viewed_user_id == current_user.id do
-      case AI.create_chat(current_user, %{title: "New Chat", model: default_model}) do
-        {:ok, chat} ->
-          {:noreply,
-           socket
-           |> push_navigate(to: ~p"/chat/#{chat.id}")}
-
-        {:error, _changeset} ->
-          {:noreply, socket |> put_flash(:error, "Failed to create chat")}
-      end
+      send(self(), :create_new_chat)
+      {:noreply, socket}
     else
       {:noreply, socket |> put_flash(:error, "Cannot create chats for other users")}
     end
@@ -301,7 +315,7 @@ defmodule PlaygroundWeb.AIChatLive do
 
   @impl true
   def handle_event("select_chat", %{"chat_id" => chat_id}, socket) do
-    {:noreply, push_navigate(socket, to: ~p"/chat/#{chat_id}")}
+    {:noreply, push_patch(socket, to: ~p"/chat/#{chat_id}")}
   end
 
   @impl true
@@ -439,6 +453,33 @@ defmodule PlaygroundWeb.AIChatLive do
      |> put_flash(:error, "AI chat service is temporarily unavailable. Please try again.")}
   end
 
+  @impl true
+  def handle_info(:load_available_models, socket) do
+    # Fetch models async to avoid blocking mount
+    available_models = fetch_available_models()
+
+    {:noreply,
+     socket
+     |> assign(:available_models, available_models)
+     |> assign(:models_loading, false)}
+  end
+
+  @impl true
+  def handle_info(:create_new_chat, socket) do
+    current_user = socket.assigns.current_user
+    default_model = socket.assigns.ai_settings.default_model
+    Logger.info("Creating new chat with default model: #{default_model}")
+
+    case AI.create_chat(current_user, %{title: "New Chat", model: default_model}) do
+      {:ok, chat} ->
+        # Use push_patch to avoid full page reload and browser loading indicator
+        {:noreply, push_patch(socket, to: ~p"/chat/#{chat.id}")}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to create chat")}
+    end
+  end
+
   defp load_chat(socket, chat_id, viewed_user_id) do
     current_user = socket.assigns.current_user
 
@@ -463,8 +504,41 @@ defmodule PlaygroundWeb.AIChatLive do
       Ecto.NoResultsError ->
         socket
         |> put_flash(:error, "Chat not found or unauthorized")
-        |> push_navigate(to: ~p"/chat")
+        |> push_patch(to: ~p"/chat")
     end
+  end
+
+  # Generate a chat title from the first message content
+  # Takes the first ~50 chars, ending at a word boundary
+  defp generate_chat_title(content) do
+    content
+    |> String.trim()
+    |> String.slice(0, 60)
+    |> then(fn text ->
+      if String.length(content) > 60 do
+        # Find last space to avoid cutting words
+        case String.last(text) do
+          " " ->
+            String.trim_trailing(text) <> "..."
+
+          _ ->
+            case :binary.match(text, " ") do
+              :nomatch ->
+                text <> "..."
+
+              _ ->
+                # Trim to last complete word
+                text
+                |> String.split(" ")
+                |> Enum.drop(-1)
+                |> Enum.join(" ")
+                |> Kernel.<>("...")
+            end
+        end
+      else
+        text
+      end
+    end)
   end
 
   defp fetch_available_models do

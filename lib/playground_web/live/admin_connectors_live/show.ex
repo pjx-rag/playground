@@ -1,10 +1,10 @@
 defmodule PlaygroundWeb.AdminConnectorsLive.Show do
   use PlaygroundWeb, :live_view
 
-  alias Playground.Connectors
+  alias Playground.Services.Connectors
   alias Playground.Files
   alias Playground.ApiTokens.TokenManager
-  alias Playground.Services.GoogleDrive
+  alias Playground.Services.Integrations.GoogleDrive
 
   import PlaygroundWeb.Components.Layout.PageLayout
 
@@ -247,7 +247,7 @@ defmodule PlaygroundWeb.AdminConnectorsLive.Show do
     connector_org = socket.assigns.connector_org
 
     # Generate OAuth URL for reconnection
-    case Playground.OAuth.create_state(socket.assigns.current_user.id, connector_org.connector_id) do
+    case Playground.Services.Connectors.OAuth.create_state(socket.assigns.current_user.id, connector_org.connector_id) do
       {:ok, state_id} ->
         auth_url = GoogleDrive.authorize_url(state: state_id)
         {:noreply, redirect(socket, external: auth_url)}

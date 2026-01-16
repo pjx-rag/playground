@@ -6,7 +6,7 @@ defmodule PlaygroundWeb.AdminAPILogsLive.Index do
   use PlaygroundWeb, :live_view
 
   import Ecto.Query
-  alias Playground.{Repo, APIRequestLog}
+  alias Playground.{Repo, Services.APIRequestLog}
   import PlaygroundWeb.Components.AdminTable
 
   @impl true
