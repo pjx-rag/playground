@@ -1,4 +1,4 @@
-defmodule Playground.Services.ObjectStorage do
+defmodule Playground.Services.Integrations.ObjectStorage do
   @moduledoc """
   Service for interacting with S3-compatible object storage (Tigris, AWS S3, etc).
   """

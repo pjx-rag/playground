@@ -1,4 +1,4 @@
-defmodule Playground.APIClient do
+defmodule Playground.Services.APIClient do
   @moduledoc """
   Behaviour for API client modules.
 
@@ -8,7 +8,7 @@ defmodule Playground.APIClient do
   ## Example
 
       defmodule Playground.Services.StripeAPI do
-        @behaviour Playground.APIClient
+        @behaviour Playground.Services.APIClient
 
         @impl true
         def service_name, do: "stripe"

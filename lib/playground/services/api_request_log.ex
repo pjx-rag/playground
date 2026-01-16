@@ -1,4 +1,4 @@
-defmodule Playground.APIRequestLog do
+defmodule Playground.Services.APIRequestLog do
   @moduledoc """
   Schema for persisting API request logs.
 

@@ -1,4 +1,4 @@
-defmodule Playground.Services.PdfAnalyzer do
+defmodule Playground.Services.AI.PdfAnalyzer do
   @moduledoc """
   Analyzes PDF files using vision AI via OpenRouter API.
 

@@ -1,4 +1,4 @@
-defmodule Playground.Services.OpenRouter do
+defmodule Playground.Services.AI.OpenRouter do
   @moduledoc """
   OpenRouter API service for LLM chat completions with streaming support.
 
@@ -32,9 +32,9 @@ defmodule Playground.Services.OpenRouter do
 
   """
 
-  @behaviour Playground.APIClient
+  @behaviour Playground.Services.APIClient
 
-  alias Playground.ReqPlugins.APILogger
+  alias Playground.Services.ReqPlugins.APILogger
   require Logger
 
   @base_url "https://openrouter.ai/api/v1"
@@ -43,15 +43,15 @@ defmodule Playground.Services.OpenRouter do
   # APIClient Behaviour Implementation
   # =============================================================================
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def service_name, do: "openrouter"
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def base_url do
     Application.get_env(:playground, :openrouter)[:base_url] || @base_url
   end
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def health_check do
     start_time = System.monotonic_time(:millisecond)
 
@@ -94,7 +94,7 @@ defmodule Playground.Services.OpenRouter do
     end
   end
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def default_headers do
     api_key = api_key()
 
@@ -108,7 +108,7 @@ defmodule Playground.Services.OpenRouter do
     ]
   end
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def request_timeout, do: 60_000
 
   # =============================================================================
@@ -380,8 +380,8 @@ defmodule Playground.Services.OpenRouter do
   defp persist_log(log_data) do
     Task.start(fn ->
       try do
-        %Playground.APIRequestLog{}
-        |> Playground.APIRequestLog.changeset(log_data)
+        %Playground.Services.APIRequestLog{}
+        |> Playground.Services.APIRequestLog.changeset(log_data)
         |> Playground.Repo.insert()
       rescue
         e ->

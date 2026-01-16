@@ -1,4 +1,4 @@
-defmodule Playground.Services.OpenRouterEmbeddings do
+defmodule Playground.Services.AI.OpenRouterEmbeddings do
   @moduledoc """
   Client for OpenRouter Embeddings API.
 

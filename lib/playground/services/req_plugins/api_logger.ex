@@ -1,11 +1,11 @@
-defmodule Playground.ReqPlugins.APILogger do
+defmodule Playground.Services.ReqPlugins.APILogger do
   @moduledoc """
   Req plugin that logs API requests to the database.
 
   ## Usage
 
       Req.new()
-      |> Playground.ReqPlugins.APILogger.attach(service: "weather")
+      |> Playground.Services.ReqPlugins.APILogger.attach(service: "weather")
       |> Req.get!("/endpoint")
 
   ## Options
@@ -173,8 +173,8 @@ defmodule Playground.ReqPlugins.APILogger do
   defp persist_to_db(log_data) do
     Task.start(fn ->
       try do
-        %Playground.APIRequestLog{}
-        |> Playground.APIRequestLog.changeset(log_data)
+        %Playground.Services.APIRequestLog{}
+        |> Playground.Services.APIRequestLog.changeset(log_data)
         |> Playground.Repo.insert()
       rescue
         e ->

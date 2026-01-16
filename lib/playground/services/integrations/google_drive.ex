@@ -1,4 +1,4 @@
-defmodule Playground.Services.GoogleDrive do
+defmodule Playground.Services.Integrations.GoogleDrive do
   @moduledoc """
   Google Drive API client implementing both APIClient and ConnectorBehaviour.
 
@@ -14,8 +14,8 @@ defmodule Playground.Services.GoogleDrive do
   - Drive API: https://developers.google.com/drive/api/v3/reference
   """
 
-  @behaviour Playground.APIClient
-  @behaviour Playground.Connectors.ConnectorBehaviour
+  @behaviour Playground.Services.APIClient
+  @behaviour Playground.Services.Connectors.ConnectorBehaviour
 
   require Logger
 
@@ -34,13 +34,13 @@ defmodule Playground.Services.GoogleDrive do
 
   ## APIClient Behaviour Implementation
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def service_name, do: "Google Drive"
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def base_url, do: @base_url
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def health_check do
     # Check if Google Drive API is reachable without requiring a customer token
     # Uses the public discovery document endpoint which doesn't require authentication
@@ -90,7 +90,7 @@ defmodule Playground.Services.GoogleDrive do
     end
   end
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def default_headers do
     [{"content-type", "application/json"}]
   end
@@ -213,7 +213,7 @@ defmodule Playground.Services.GoogleDrive do
 
   ## ConnectorBehaviour Implementation
 
-  @impl Playground.Connectors.ConnectorBehaviour
+  @impl Playground.Services.Connectors.ConnectorBehaviour
   def list_files(token, opts \\ []) do
     params =
       build_list_params(opts)
@@ -237,7 +237,7 @@ defmodule Playground.Services.GoogleDrive do
     end
   end
 
-  @impl Playground.Connectors.ConnectorBehaviour
+  @impl Playground.Services.Connectors.ConnectorBehaviour
   def get_file_metadata(token, file_id) do
     params = %{fields: file_fields()}
 
@@ -261,14 +261,14 @@ defmodule Playground.Services.GoogleDrive do
     end
   end
 
-  @impl Playground.Connectors.ConnectorBehaviour
+  @impl Playground.Services.Connectors.ConnectorBehaviour
   def get_folder_contents(token, folder_id, opts \\ []) do
     # Add folder filter to query
     opts = Keyword.put(opts, :folder_id, folder_id)
     list_files(token, opts)
   end
 
-  @impl Playground.Connectors.ConnectorBehaviour
+  @impl Playground.Services.Connectors.ConnectorBehaviour
   def get_file(token, file_id, opts \\ []) do
     stream? = Keyword.get(opts, :stream, false)
     export_format = Keyword.get(opts, :export_format)

@@ -1,4 +1,4 @@
-defmodule Playground.Services.WeatherAPI do
+defmodule Playground.Services.Integrations.WeatherAPI do
   @moduledoc """
   Weather API service using Open-Meteo (free, no API key required).
 
@@ -18,9 +18,9 @@ defmodule Playground.Services.WeatherAPI do
 
   """
 
-  @behaviour Playground.APIClient
+  @behaviour Playground.Services.APIClient
 
-  alias Playground.ReqPlugins.APILogger
+  alias Playground.Services.ReqPlugins.APILogger
 
   @base_url "https://api.open-meteo.com"
 
@@ -28,13 +28,13 @@ defmodule Playground.Services.WeatherAPI do
   # APIClient Behaviour Implementation
   # =============================================================================
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def service_name, do: "weather"
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def base_url, do: @base_url
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def health_check do
     start_time = System.monotonic_time(:millisecond)
 
@@ -67,12 +67,12 @@ defmodule Playground.Services.WeatherAPI do
     end
   end
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def default_headers do
     [{"accept", "application/json"}]
   end
 
-  @impl Playground.APIClient
+  @impl Playground.Services.APIClient
   def request_timeout, do: 10_000
 
   # =============================================================================
