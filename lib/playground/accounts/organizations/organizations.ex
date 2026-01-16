@@ -1,16 +1,17 @@
-defmodule Playground.Organizations do
+defmodule Playground.Accounts.Organizations do
   @moduledoc """
-  The Organizations context.
+  Organizations sub-context within Accounts.
 
   Manages organizations and their user memberships. All users belong to exactly one organization.
   Currently hardcoded to "PJX" organization for single-tenant UI with multi-tenant backend.
+
+  Organizations provide tenant boundaries for multi-tenancy within the Accounts context.
   """
 
   import Ecto.Query, warn: false
   alias Playground.Repo
 
-  alias Playground.Organizations.Organization
-  alias Playground.Organizations.OrganizationUser
+  alias Playground.Accounts.Organizations.{Organization, OrganizationUser}
 
   @doc """
   Gets a single organization.
