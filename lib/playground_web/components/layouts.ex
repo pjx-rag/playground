@@ -94,47 +94,58 @@ defmodule PlaygroundWeb.Layouts do
     <%= if @current_user do %>
       <!-- Mobile sidebar -->
       <.sheet id="mobile-sidebar-nav" placement="left" class="w-full max-w-xs">
-        <div class="flex flex-1 flex-col h-full">
-          <div class="flex mb-6 shrink-0 items-center">
-            <.link navigate="/dashboard">
-              <img
-                src={@logo_url}
-                alt="Playground"
-                class="h-7 w-auto logo-adaptive"
-              />
-            </.link>
-          </div>
+        <div class="flex flex-1 flex-col h-full pt-4">
           <.sidebar_nav current_user={@current_user} collapsed={false} />
         </div>
       </.sheet>
 
-      <div class="group/layout relative isolate flex h-svh w-full bg-base max-md:flex-col overflow-hidden">
+      <!-- Full-width header with logo -->
+      <header class="fixed top-0 left-0 right-0 z-30 bg-base border-b border-base">
+        <div class="flex h-14 shrink-0 items-center gap-x-4 px-4 sm:px-6">
+          <!-- Mobile menu button -->
+          <button
+            phx-click={Fluxon.open_dialog("mobile-sidebar-nav")}
+            class="relative cursor-pointer flex min-w-0 items-center -m-2 p-2 md:hidden"
+          >
+            <.icon name="hero-bars-3" class="size-6" />
+          </button>
+
+          <.separator vertical class="my-4 md:hidden" />
+
+          <!-- Logo -->
+          <.link navigate="/dashboard" class="flex items-center gap-2">
+            <img
+              src={@logo_url}
+              alt="Playground"
+              class="h-6 w-auto logo-adaptive"
+            />
+            <span class="text-lg font-bold text-foreground">
+              AcmeCo.
+            </span>
+          </.link>
+
+          <!-- User menu on right -->
+          <div class="ml-auto flex items-center gap-x-4 md:gap-x-6">
+            <%= if @page_title_suffix do %>
+              {@page_title_suffix}
+            <% end %>
+            <.user_menu current_user={@current_user} />
+          </div>
+        </div>
+      </header>
+
+      <div class="group/layout relative isolate flex h-svh w-full bg-base max-md:flex-col overflow-hidden pt-14">
         <!-- Desktop Sidebar -->
         <div
           id="desktop-sidebar"
           phx-hook="SidebarCollapse"
           class={[
-            "fixed inset-y-0 left-0 z-20 max-md:hidden border-r border-base transition-all duration-200",
+            "fixed top-14 bottom-0 left-0 z-20 max-md:hidden border-r border-base transition-all duration-200",
             if(@sidebar_collapsed, do: "w-20", else: "w-64")
           ]}
         >
           <div class="flex h-full flex-col">
             <div class="flex flex-1 flex-col overflow-y-auto p-6">
-              <div class="flex shrink-0 items-center mb-8 gap-2">
-                <.link navigate="/dashboard" class="flex items-center gap-2">
-                  <img
-                    src={@logo_url}
-                    alt="Playground"
-                    class="h-6 w-auto logo-adaptive"
-                  />
-                  <span class={[
-                    "text-xl font-extrabold text-foreground transition-opacity duration-200",
-                    if(@sidebar_collapsed, do: "opacity-0 w-0 overflow-hidden", else: "opacity-100 delay-150")
-                  ]}>
-                    AcmeCo.
-                  </span>
-                </.link>
-              </div>
               <.sidebar_nav current_user={@current_user} collapsed={@sidebar_collapsed} />
               <!-- Collapse button -->
               <.navlist class="mt-auto pt-4 border-t border-base">
@@ -149,75 +160,49 @@ defmodule PlaygroundWeb.Layouts do
           "flex flex-1 flex-col md:min-w-0 overflow-hidden group-[[data-sidebar-transitioning]]/layout:transition-[padding] group-[[data-sidebar-transitioning]]/layout:duration-200",
           if(@sidebar_collapsed, do: "md:pl-20", else: "md:pl-64")
         ]}>
-          <header class="bg-base sticky z-10 top-0 border-b border-base">
-            <div class="flex h-16 shrink-0 items-center gap-x-4 px-4 sm:px-6 md:px-8">
-              <button
-                phx-click={Fluxon.open_dialog("mobile-sidebar-nav")}
-                class="relative cursor-pointer flex min-w-0 items-center -m-2 p-2 md:hidden"
-              >
-                <.icon name="hero-bars-3" class="size-6" />
-              </button>
-
-              <.separator vertical class="my-5 md:hidden" />
-
-              <div class="flex items-center gap-3">
-                <h1 class="text-xl font-semibold text-foreground">
-                  {@page_title || "Dashboard"}
-                </h1>
-                <%= if @page_title_suffix do %>
-                  {@page_title_suffix}
-                <% end %>
-              </div>
-
-              <div class="ml-auto flex items-center gap-x-4 md:gap-x-6">
-                <.user_menu current_user={@current_user} />
-              </div>
+          <%= if @header_content do %>
+            <div class="bg-base sticky z-10 top-0 border-b border-base px-4 sm:px-6 md:px-8 py-2">
+              {@header_content}
             </div>
-
-            <%= if @header_content do %>
-              <div class="px-4 sm:px-6 md:px-8 py-2 border-t border-base">
-                {@header_content}
-              </div>
-            <% else %>
-              <%= if @breadcrumbs && length(@breadcrumbs) > 0 do %>
-                <div class="px-4 sm:px-6 md:px-8 py-2 border-t border-base">
-                  <nav aria-label="Breadcrumb" class="flex w-full overflow-x-auto">
-                    <ol role="list" class="flex items-center space-x-4 whitespace-nowrap">
+          <% else %>
+            <%= if @breadcrumbs && length(@breadcrumbs) > 0 do %>
+              <div class="bg-base sticky z-10 top-0 border-b border-base px-4 sm:px-6 md:px-8 py-2">
+                <nav aria-label="Breadcrumb" class="flex w-full overflow-x-auto">
+                  <ol role="list" class="flex items-center space-x-4 whitespace-nowrap">
+                    <li>
+                      <.link
+                        navigate={~p"/dashboard"}
+                        class="text-muted-foreground hover:text-foreground"
+                      >
+                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="size-5 shrink-0">
+                          <path d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd" fill-rule="evenodd" />
+                        </svg>
+                        <span class="sr-only">Home</span>
+                      </.link>
+                    </li>
+                    <%= for crumb <- @breadcrumbs |> Enum.reject(&(Map.get(&1, :label) in ["Home", "Dashboard"])) do %>
                       <li>
-                        <.link
-                          navigate={~p"/dashboard"}
-                          class="text-muted-foreground hover:text-foreground"
-                        >
-                          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="size-5 shrink-0">
-                            <path d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd" fill-rule="evenodd" />
+                        <div class="flex items-center">
+                          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="size-5 shrink-0 text-muted-foreground">
+                            <path d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd" />
                           </svg>
-                          <span class="sr-only">Home</span>
-                        </.link>
+                          <%= if crumb[:path] do %>
+                            <.link navigate={crumb[:path]} class="ml-4 text-sm font-medium text-muted-foreground hover:text-foreground">
+                              {crumb[:label]}
+                            </.link>
+                          <% else %>
+                            <span aria-current="page" class="ml-4 text-sm font-medium text-muted-foreground">
+                              {crumb[:label]}
+                            </span>
+                          <% end %>
+                        </div>
                       </li>
-                      <%= for crumb <- @breadcrumbs |> Enum.reject(&(Map.get(&1, :label) in ["Home", "Dashboard"])) do %>
-                        <li>
-                          <div class="flex items-center">
-                            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="size-5 shrink-0 text-muted-foreground">
-                              <path d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd" />
-                            </svg>
-                            <%= if crumb[:path] do %>
-                              <.link navigate={crumb[:path]} class="ml-4 text-sm font-medium text-muted-foreground hover:text-foreground">
-                                {crumb[:label]}
-                              </.link>
-                            <% else %>
-                              <span aria-current="page" class="ml-4 text-sm font-medium text-muted-foreground">
-                                {crumb[:label]}
-                              </span>
-                            <% end %>
-                          </div>
-                        </li>
-                      <% end %>
-                    </ol>
-                  </nav>
-                </div>
-              <% end %>
+                    <% end %>
+                  </ol>
+                </nav>
+              </div>
             <% end %>
-          </header>
+          <% end %>
 
           <.flash_group flash={@flash} />
 
