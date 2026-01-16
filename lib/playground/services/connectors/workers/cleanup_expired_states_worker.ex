@@ -1,4 +1,4 @@
-defmodule Playground.OAuth.CleanupExpiredStatesWorker do
+defmodule Playground.Services.Connectors.Workers.CleanupExpiredStatesWorker do
   @moduledoc """
   Cleans up expired OAuth states from the database.
 
@@ -8,7 +8,7 @@ defmodule Playground.OAuth.CleanupExpiredStatesWorker do
 
   require Logger
 
-  alias Playground.OAuth
+  alias Playground.Services.Connectors.OAuth
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do

@@ -1,4 +1,4 @@
-defmodule Playground.OAuth do
+defmodule Playground.Services.Connectors.OAuth do
   @moduledoc """
   Context for managing OAuth state parameters with CSRF protection.
 
@@ -7,7 +7,7 @@ defmodule Playground.OAuth do
 
   import Ecto.Query
   alias Playground.Repo
-  alias Playground.OAuth.OAuthState
+  alias Playground.Services.Connectors.OAuthState
 
   @state_ttl_seconds 600  # 10 minutes
 

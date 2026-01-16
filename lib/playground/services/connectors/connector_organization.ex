@@ -1,4 +1,4 @@
-defmodule Playground.Connectors.ConnectorOrganization do
+defmodule Playground.Services.Connectors.ConnectorOrganization do
   @moduledoc """
   An organization's connection to a connector type.
 
@@ -11,8 +11,8 @@ defmodule Playground.Connectors.ConnectorOrganization do
   @statuses ~w(pending_auth awaiting_sync syncing synced disconnected)
 
   schema "connector_organizations" do
-    belongs_to :organization, Playground.Organizations.Organization
-    belongs_to :connector, Playground.Connectors.Connector
+    belongs_to :organization, Playground.Accounts.Organizations.Organization
+    belongs_to :connector, Playground.Services.Connectors.Connector
     belongs_to :user, Playground.Accounts.User
 
     field :status, :string, default: "pending_auth"

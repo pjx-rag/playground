@@ -1,4 +1,4 @@
-defmodule Playground.OAuth.OAuthState do
+defmodule Playground.Services.Connectors.OAuthState do
   @moduledoc """
   Represents a temporary OAuth state parameter for CSRF protection.
 

@@ -1,6 +1,6 @@
-defmodule Playground.Connectors do
+defmodule Playground.Services.Connectors do
   @moduledoc """
-  The Connectors context.
+  Context for managing connectors and organization connections.
 
   Manages connector types (catalog) and organization connections to connectors.
   """
@@ -8,9 +8,8 @@ defmodule Playground.Connectors do
   import Ecto.Query, warn: false
   alias Playground.Repo
 
-  alias Playground.Connectors.Connector
-  alias Playground.Connectors.ConnectorOrganization
-  alias Playground.Organizations
+  alias Playground.Services.Connectors.{Connector, ConnectorOrganization}
+  alias Playground.Accounts.Organizations
 
   ## Connector Catalog
 

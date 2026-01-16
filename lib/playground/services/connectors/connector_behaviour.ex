@@ -1,4 +1,4 @@
-defmodule Playground.Connectors.ConnectorBehaviour do
+defmodule Playground.Services.Connectors.ConnectorBehaviour do
   @moduledoc """
   Behaviour for connector implementations (Google Drive, Dropbox, etc.).
 

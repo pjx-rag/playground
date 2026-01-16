@@ -1,4 +1,4 @@
-defmodule Playground.Connectors.Connector do
+defmodule Playground.Services.Connectors.Connector do
   @moduledoc """
   Catalog of available connector types (Google Drive, Dropbox, etc.).
 
@@ -12,7 +12,7 @@ defmodule Playground.Connectors.Connector do
     field :name, :string
     field :icon, :string
 
-    has_many :connector_organizations, Playground.Connectors.ConnectorOrganization
+    has_many :connector_organizations, Playground.Services.Connectors.ConnectorOrganization
 
     timestamps(type: :utc_datetime)
   end
