@@ -11,7 +11,7 @@ defmodule Playground.Files.Queries do
   import Ecto.Query
   alias Playground.Repo
   alias Playground.Files.File
-  alias Playground.Organizations
+  alias Playground.Accounts.Organizations
 
   @doc """
   Lists all files for a connector organization, excluding deleted files by default.
@@ -65,6 +65,27 @@ defmodule Playground.Files.Queries do
       preload: [connector_organization: :connector]
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Gets a single file by ID without organization verification.
+
+  Used for internal operations like RAG processing.
+
+  ## Examples
+
+      iex> get(123)
+      {:ok, %File{}}
+
+      iex> get(456)
+      {:error, :not_found}
+
+  """
+  def get(id) do
+    case Repo.get(File, id) |> Repo.preload([connector_organization: :connector]) do
+      nil -> {:error, :not_found}
+      file -> {:ok, file}
+    end
   end
 
   @doc """
@@ -133,7 +154,7 @@ defmodule Playground.Files.Queries do
 
   # Private helper to get connector org IDs for an organization
   defp get_connector_org_ids(organization_id) do
-    from(co in Playground.Connectors.ConnectorOrganization,
+    from(co in Playground.Services.Connectors.ConnectorOrganization,
       where: co.organization_id == ^organization_id,
       select: co.id
     )

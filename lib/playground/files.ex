@@ -24,6 +24,7 @@ defmodule Playground.Files do
     as: :list_for_connector
 
   defdelegate list_synced_files(user), to: Queries, as: :list_synced_for_user
+  defdelegate get_file(id), to: Queries, as: :get
   defdelegate get_file!(id, user), to: Queries, as: :get_for_user!
 
   defdelegate get_file_by_provider_id(connector_organization_id, provider_file_id),
@@ -46,6 +47,7 @@ defmodule Playground.Files do
   defdelegate upsert_file(attrs), to: Operations, as: :upsert
   defdelegate bulk_update_sync_status(file_ids, status), to: Operations
   defdelegate reset_file_for_reprocessing(file), to: Operations, as: :reset_for_reprocessing
+  defdelegate reset_file_status(file_id), to: Operations, as: :reset_status
 
   # ============================================================================
   # PROCESSING & RAG PIPELINE

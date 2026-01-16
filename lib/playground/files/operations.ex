@@ -135,6 +135,27 @@ defmodule Playground.Files.Operations do
   end
 
   @doc """
+  Resets a file's processing status by ID.
+
+  Used by RAG pipeline for internal reprocessing operations.
+
+  ## Examples
+
+      iex> reset_status(123)
+      {:ok, %File{}}
+
+      iex> reset_status(456)
+      {:error, :not_found}
+
+  """
+  def reset_status(file_id) when is_integer(file_id) do
+    case Repo.get(File, file_id) do
+      nil -> {:error, :not_found}
+      file -> reset_for_reprocessing(file)
+    end
+  end
+
+  @doc """
   Resets a file for reprocessing by incrementing its revision and clearing chunks.
 
   This allows a file to be reprocessed from scratch:
